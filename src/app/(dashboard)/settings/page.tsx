@@ -128,7 +128,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <Card>
         <ul className="divide-y divide-line">
-          <LinkRow href="/jobs" title="Job Collection" description="Schedule, Job Boards, Job Feeds and Excluded Keywords" />
           <LinkRow href="/google" title="Google" description="Gmail connection and Resume Folder" />
           <LinkRow href="/function-runs" title="Function runs" description="Recent runs and their errors" />
           <LinkRow
