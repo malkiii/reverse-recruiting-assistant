@@ -13,8 +13,8 @@ import type {
 } from "./gateways";
 import type { JobFunction } from "./schema";
 
-/** The most Decision Makers one Application has, and how many people each employees run asks for. */
-export const DECISION_MAKERS_PER_APPLICATION = 4;
+/** The most Decision Makers an Application chooses on its own, and how many people each employees run asks for. The Admin can add more. */
+export const DECISION_MAKERS_PER_APPLICATION = 5;
 
 /** Human Resources, Entrepreneurship, Operations, Product Management, then Program & Project Management. */
 const FUNCTION_ORDER: JobFunction[] = ["12", "9", "18", "19", "20"];
@@ -118,7 +118,7 @@ async function actorRunner(deps: DecisionMakerSearchDeps, applicationId: number,
 }
 
 /**
- * Searches the Company's employees function by function until 4 have emails, and saves everyone found to the
+ * Searches the Company's employees function by function until 5 have emails, and saves everyone found to the
  * Company, including those with no email. Emails are looked up only for as many people as are still needed. "any" is
  * searched only when nobody with an email was found. Returns everyone found, as saved.
  */
@@ -186,7 +186,7 @@ function isCurrent(foundAt: Date, now: Date) {
   return now < refreshAt;
 }
 
-const inCooldown = ({ lastEmailedAt }: DecisionMaker, now: Date) =>
+export const inCooldown = ({ lastEmailedAt }: DecisionMaker, now: Date) =>
   lastEmailedAt !== null && now.getTime() - lastEmailedAt.getTime() < COOLDOWN_MS;
 
 function daysAgo(date: Date, now: Date) {
@@ -207,7 +207,7 @@ export type DecisionMakerChoice =
   | { outcome: "no-contacts" }
   | { outcome: "all-in-cooldown"; reason: string };
 
-/** Up to 4 people with emails who aren't in Cooldown. */
+/** Up to 5 people with emails who aren't in Cooldown. */
 function chooseFrom(people: DecisionMaker[], now: Date): DecisionMakerChoice {
   const withEmail = people.filter(({ email }) => email);
   if (withEmail.length === 0) return { outcome: "no-contacts" };

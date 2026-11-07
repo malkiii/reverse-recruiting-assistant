@@ -8,7 +8,14 @@ import type { ReactNode } from "react";
 import { STEP_NAMES } from "@/components/status";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, CardHeader, DetailList, dateTime, ExternalLink, linkClass, SourceBadge, StatusBadge, Tag } from "@/components/ui";
-import { applicationAsOf, cancel, edit, type EditResult, removeDecisionMaker } from "@/lib/application-lifecycle";
+import {
+  addDecisionMaker,
+  applicationAsOf,
+  cancel,
+  edit,
+  type EditResult,
+  removeDecisionMaker,
+} from "@/lib/application-lifecycle";
 import { startFunction } from "@/lib/dashboard-functions";
 import { dashboardGoogle } from "@/lib/dashboard-google";
 import { groupPeople, type NotChosenReason } from "@/lib/decision-maker-search";
@@ -90,6 +97,23 @@ async function removeDecisionMakerAction(formData: FormData) {
     {
       applications: applicationStore(),
       decisionMakers: drizzleDecisionMakerStore(parseDashboardEnv(process.env).DATABASE_URL),
+      now: () => new Date(),
+    },
+    applicationId,
+    Number(formData.get("decisionMakerId")),
+  );
+  backToApplication(applicationId, result.saved ? undefined : result.error);
+}
+
+async function addDecisionMakerAction(formData: FormData) {
+  "use server";
+
+  const applicationId = Number(formData.get("applicationId"));
+  const result = await addDecisionMaker(
+    {
+      applications: applicationStore(),
+      decisionMakers: drizzleDecisionMakerStore(parseDashboardEnv(process.env).DATABASE_URL),
+      now: () => new Date(),
     },
     applicationId,
     Number(formData.get("decisionMakerId")),
@@ -425,7 +449,17 @@ export default async function ApplicationPage({
                 <Person {...person}>
                   {person.email && <p className="truncate text-sm text-fg-2">{person.email}</p>}
                 </Person>
-                <div className="shrink-0 pt-0.5">{REASON_TAGS[person.reason]}</div>
+                {inReview && person.reason === "not-chosen" ? (
+                  <form action={addDecisionMakerAction}>
+                    <HiddenId application={application} />
+                    <input type="hidden" name="decisionMakerId" value={person.id} />
+                    <SubmitButton variant="ghost" pendingText="Adding…">
+                      Add
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <div className="shrink-0 pt-0.5">{REASON_TAGS[person.reason]}</div>
+                )}
               </li>
             ))}
           </ul>

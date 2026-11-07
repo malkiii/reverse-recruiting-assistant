@@ -511,6 +511,26 @@ export function drizzleApplicationStore(databaseUrl: string): ApplicationStore {
       return removed.length > 0;
     },
 
+    async addRecipient(id: number, decisionMakerId: number) {
+      // Only while the Application is in Review, so a Send that has started never gains a recipient.
+      const db = client(databaseUrl);
+      const added = await db
+        .insert(applicationRecipients)
+        .select(
+          db
+            .select({
+              applicationId: applications.id,
+              decisionMakerId: sql<number>`${decisionMakerId}`.as("decision_maker_id"),
+              sentAt: sql<Date | null>`null`.as("sent_at"),
+            })
+            .from(applications)
+            .where(and(eq(applications.id, id), eq(applications.status, "in-review"))),
+        )
+        .onConflictDoNothing()
+        .returning({ id: applicationRecipients.decisionMakerId });
+      return added.length > 0;
+    },
+
     async claimSend(id: number) {
       // Only an Application in Review matches, so a double click on Send claims it once.
       const claimed = await client(databaseUrl)

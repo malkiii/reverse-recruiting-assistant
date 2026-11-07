@@ -65,7 +65,7 @@ Anyone found at a Company during the search for Decision Makers, with or without
 _Avoid_: Contact, lead, employee
 
 **Decision Maker**:
-A person at a Company chosen to receive Applications, by job function priority. A Company has at most 4 in any one Application.
+A person at a Company chosen to receive Applications, by job function priority. The search chooses at most 5 for an Application; the Admin can add more of the Company's people with emails in Review.
 _Avoid_: Contact, lead, recruiter, reach-out person
 
 **Application**:

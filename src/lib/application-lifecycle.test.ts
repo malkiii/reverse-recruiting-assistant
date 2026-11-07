@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  addDecisionMaker,
   applicationAsOf,
   cancel,
   edit,
@@ -511,7 +512,7 @@ const person = (name: string): Person => ({
   photo: null,
 });
 
-const search = (jobFunction: JobFunction): EmployeeSearch => ({ companyUrl: acmePage.url, jobFunction, maxEmployees: 4 });
+const search = (jobFunction: JobFunction): EmployeeSearch => ({ companyUrl: acmePage.url, jobFunction, maxEmployees: 5 });
 
 type Deps = Awaited<ReturnType<typeof setup>>;
 
@@ -541,10 +542,10 @@ async function prepareToDecisionMakers(deps: Deps) {
 
 const names = (people: { name: string }[]) => people.map(({ name }) => name);
 
-test("Decision Makers are searched function by function until 4 have emails, asking each run for 4", async () => {
+test("Decision Makers are searched function by function until 5 have emails, asking each run for 5", async () => {
   const deps = await setup();
-  employees(deps, "12", ["Ann", "Bob"]);
-  emails(deps, ["Ann", "Bob"], ["Ann", "Bob"]);
+  employees(deps, "12", ["Ann", "Bob", "Gus"]);
+  emails(deps, ["Ann", "Bob", "Gus"], ["Ann", "Bob", "Gus"]);
   employees(deps, "9", ["Cy", "Dee"]);
   emails(deps, ["Cy", "Dee"], ["Cy"]);
   employees(deps, "18", ["Eve", "Fay"]);
@@ -555,12 +556,12 @@ test("Decision Makers are searched function by function until 4 have emails, ask
   expect(deps.employeesActor.inputs).toEqual([search("12"), search("9"), search("18")]);
   // Emails are looked up only for as many people as are still needed, so Fay isn't looked up.
   expect(deps.emailsActor.inputs).toEqual([
-    [person("Ann").profileUrl, person("Bob").profileUrl],
+    [person("Ann").profileUrl, person("Bob").profileUrl, person("Gus").profileUrl],
     [person("Cy").profileUrl, person("Dee").profileUrl],
     [person("Eve").profileUrl],
   ]);
-  expect(names(await deps.decisionMakers.listForApplication(id))).toEqual(["Ann", "Bob", "Cy", "Eve"]);
-  expect(names(await deps.decisionMakers.listForCompany(1))).toEqual(["Ann", "Bob", "Cy", "Dee", "Eve", "Fay"]);
+  expect(names(await deps.decisionMakers.listForApplication(id))).toEqual(["Ann", "Bob", "Gus", "Cy", "Eve"]);
+  expect(names(await deps.decisionMakers.listForCompany(1))).toEqual(["Ann", "Bob", "Gus", "Cy", "Dee", "Eve", "Fay"]);
   expect(await deps.applications.get(id)).toMatchObject({
     status: "in-review",
     error: null,
@@ -642,8 +643,8 @@ test("nobody with an email ends the Application as No Contacts, still saving the
 
 test("each actor run is saved before it's polled, with the Application and what it's for", async () => {
   const deps = await setup();
-  employees(deps, "12", ["Ann", "Bob", "Cy", "Dee"]);
-  emails(deps, ["Ann", "Bob", "Cy", "Dee"], ["Ann", "Bob", "Cy", "Dee"]);
+  employees(deps, "12", ["Ann", "Bob", "Cy", "Dee", "Eve"]);
+  emails(deps, ["Ann", "Bob", "Cy", "Dee", "Eve"], ["Ann", "Bob", "Cy", "Dee", "Eve"]);
   deps.employeesActor.statuses.set(JSON.stringify(search("12")), ["running", "running", "succeeded"]);
 
   const id = await prepareToDecisionMakers(deps);
@@ -653,13 +654,13 @@ test("each actor run is saved before it's polled, with the Application and what 
     { runId: "emails-run-1", actor: "emails", token: "token-b", applicationId: id, purpose: "emails:12" },
   ]);
   expect(await deps.actorRuns.listUnfinished()).toEqual([]);
-  expect(names(await deps.decisionMakers.listForApplication(id))).toHaveLength(4);
+  expect(names(await deps.decisionMakers.listForApplication(id))).toHaveLength(5);
 });
 
 test("a Retry resumes the actor run still going instead of starting another", async () => {
   const deps = await setup();
-  employees(deps, "12", ["Ann", "Bob", "Cy", "Dee"]);
-  emails(deps, ["Ann", "Bob", "Cy", "Dee"], ["Ann", "Bob", "Cy", "Dee"]);
+  employees(deps, "12", ["Ann", "Bob", "Cy", "Dee", "Eve"]);
+  emails(deps, ["Ann", "Bob", "Cy", "Dee", "Eve"], ["Ann", "Bob", "Cy", "Dee", "Eve"]);
   // Still running after every poll the Function has, then done by the Retry.
   deps.employeesActor.statuses.set(JSON.stringify(search("12")), [...Array(121).fill("running"), "succeeded"]);
 
@@ -1048,6 +1049,48 @@ test("in Review, the Admin can remove a Decision Maker, but not the last one", a
   expect(names(await deps.decisionMakers.listForCompany(1))).toEqual(["Ann", "Bob"]);
 });
 
+test("in Review, the Admin can add anyone at the Company with an email who isn't in Cooldown", async () => {
+  const deps = await setup();
+  const id = await reachReview(deps);
+  const at = new Date("2026-11-01T00:00:00Z");
+  const [cy, dee, eve] = await deps.decisionMakers.save(
+    1,
+    [
+      { ...person("Cy"), email: "cy@acme.com", jobFunction: "9" },
+      { ...person("Dee"), email: null, jobFunction: "9" },
+      { ...person("Eve"), email: "eve@acme.com", jobFunction: "9" },
+    ],
+    at,
+  );
+  deps.decisionMakers.emailed("Eve", at);
+  const [ann] = await deps.decisionMakers.listForApplication(id);
+
+  expect(await addDecisionMaker(deps, id, cy.id)).toEqual({ saved: true });
+  expect(await addDecisionMaker(deps, id, ann.id)).toEqual({
+    saved: false,
+    error: "That person is already one of this Application's Decision Makers",
+  });
+  expect(await addDecisionMaker(deps, id, dee.id)).toEqual({ saved: false, error: "That person has no email" });
+  expect(await addDecisionMaker(deps, id, eve.id)).toEqual({ saved: false, error: "That person is in Cooldown" });
+  expect(await addDecisionMaker(deps, id, 999)).toEqual({
+    saved: false,
+    error: "That person wasn't found at this Application's Company",
+  });
+
+  expect(names(await deps.decisionMakers.listForApplication(id))).toEqual(["Ann", "Bob", "Cy"]);
+});
+
+test("a removed Decision Maker can be added back", async () => {
+  const deps = await setup();
+  const id = await reachReview(deps);
+  const [, bob] = await deps.decisionMakers.listForApplication(id);
+
+  await removeDecisionMaker(deps, id, bob.id);
+  expect(await addDecisionMaker(deps, id, bob.id)).toEqual({ saved: true });
+
+  expect(names(await deps.decisionMakers.listForApplication(id))).toEqual(["Ann", "Bob"]);
+});
+
 test("edits are only accepted while the Application is in Review", async () => {
   const deps = await setup();
   const preparing = (await prepare(deps, 2))!;
@@ -1062,6 +1105,7 @@ test("edits are only accepted while the Application is in Review", async () => {
     });
   }
   expect(await removeDecisionMaker(deps, cancelled, bob.id)).toMatchObject({ saved: false });
+  expect(await addDecisionMaker(deps, cancelled, bob.id)).toMatchObject({ saved: false });
 
   expect(await deps.applications.get(cancelled)).toMatchObject({ status: "cancelled", subject: letter.subject });
   expect(await deps.applications.get(preparing)).toMatchObject({ subject: null });

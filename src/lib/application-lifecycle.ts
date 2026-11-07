@@ -26,6 +26,7 @@ import {
   chooseDecisionMakers,
   type DecisionMakerSearchDeps,
   describePerson,
+  inCooldown,
   newPollBudget,
   type PollBudget,
   savedPeopleCooldownReason,
@@ -161,9 +162,9 @@ export async function edit(deps: EditDeps, applicationId: number, { subject, cov
   return saved ? SAVED : refused(NOT_IN_REVIEW);
 }
 
-export type RemoveDeps = Pick<ClaimDeps, "applications"> & Pick<PrepareDeps, "decisionMakers">;
+export type RemoveDeps = Pick<ClaimDeps, "applications" | "now"> & Pick<PrepareDeps, "decisionMakers">;
 
-/** The Admin's removal of a Decision Maker in Review. There's no way to add one, as that would skip the Cooldown check and email lookup. */
+/** The Admin's removal of a Decision Maker in Review. They stay at the Company, so they can be added back. */
 export async function removeDecisionMaker(deps: RemoveDeps, applicationId: number, decisionMakerId: number) {
   const application = await deps.applications.get(applicationId);
   if (application?.status !== "in-review") return refused(NOT_IN_REVIEW);
@@ -173,11 +174,32 @@ export async function removeDecisionMaker(deps: RemoveDeps, applicationId: numbe
   return (await deps.applications.removeRecipient(applicationId, decisionMakerId)) ? SAVED : refused(NOT_IN_REVIEW);
 }
 
+/**
+ * The Admin's addition of a Decision Maker in Review: anyone found at the Application's Company with an email who
+ * isn't in Cooldown, beyond the 5 it chose on its own.
+ */
+export async function addDecisionMaker(deps: RemoveDeps, applicationId: number, decisionMakerId: number) {
+  const application = await deps.applications.get(applicationId);
+  if (application?.status !== "in-review" || application.companyId === null) return refused(NOT_IN_REVIEW);
+  const recipients = await deps.decisionMakers.listForApplication(applicationId);
+  if (recipients.some(({ id }) => id === decisionMakerId)) return refused(ALREADY_A_RECIPIENT);
+  const people = await deps.decisionMakers.listForCompany(application.companyId);
+  const person = people.find(({ id }) => id === decisionMakerId);
+  if (!person) return refused(NOT_AT_COMPANY);
+  if (!person.email) return refused(NO_EMAIL);
+  if (inCooldown(person, deps.now())) return refused(IN_COOLDOWN);
+  return (await deps.applications.addRecipient(applicationId, decisionMakerId)) ? SAVED : refused(NOT_IN_REVIEW);
+}
+
 const SAVED: EditResult = { saved: true };
 const refused = (error: string): EditResult => ({ saved: false, error });
 const NOT_IN_REVIEW = "Only an Application in Review can be edited";
 const NOT_A_RECIPIENT = "That person isn't one of this Application's Decision Makers";
 const LAST_RECIPIENT = "An Application needs a Decision Maker: Cancel it instead";
+const ALREADY_A_RECIPIENT = "That person is already one of this Application's Decision Makers";
+const NOT_AT_COMPANY = "That person wasn't found at this Application's Company";
+const NO_EMAIL = "That person has no email";
+const IN_COOLDOWN = "That person is in Cooldown";
 const EMPTY_SUBJECT = "The subject can't be empty";
 const NOT_A_RESUME = "That file isn't one of the Resumes in your Resume Folder";
 const MISSING_PLACEHOLDERS = "The Cover Letter needs {{name}} in its first line and {{resume_link}} at its end";

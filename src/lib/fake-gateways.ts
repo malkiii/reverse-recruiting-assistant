@@ -415,6 +415,17 @@ export class FakeApplicationStore implements ApplicationStore {
     return true;
   }
 
+  async addRecipient(id: number, decisionMakerId: number) {
+    const application = this.applications.find((saved) => saved.id === id);
+    if (application?.status !== "in-review") return false;
+    const added = this.decisionMakers.recipients.some(
+      (recipient) => recipient.applicationId === id && recipient.decisionMakerId === decisionMakerId,
+    );
+    if (added) return false;
+    this.decisionMakers.recipients.push({ applicationId: id, decisionMakerId, sentAt: null });
+    return true;
+  }
+
   async claimSend(id: number) {
     const application = this.applications.find((saved) => saved.id === id);
     if (application?.status !== "in-review") return false;
