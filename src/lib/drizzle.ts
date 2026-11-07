@@ -602,6 +602,7 @@ export function drizzleDecisionMakerStore(databaseUrl: string): DecisionMakerSto
             set: {
               headline: sql`excluded.headline`,
               profileUrl: sql`excluded.profile_url`,
+              photo: sql`excluded.photo`,
               // A person found again without an email lookup keeps the email already known.
               email: sql`coalesce(excluded.email, ${decisionMakers.email})`,
               jobFunction: sql`excluded.job_function`,

@@ -1,12 +1,13 @@
 import { AutoRefresh } from "@/components/auto-refresh";
+import { Avatar } from "@/components/avatar";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
-import { sourceName, STEP_NAMES } from "@/components/status";
+import { STEP_NAMES } from "@/components/status";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Card, CardHeader, DetailList, dateTime, ExternalLink, linkClass, StatusBadge, Tag } from "@/components/ui";
+import { Alert, Card, CardHeader, DetailList, dateTime, ExternalLink, linkClass, SourceBadge, StatusBadge, Tag } from "@/components/ui";
 import { applicationAsOf, cancel, edit, type EditResult, removeDecisionMaker } from "@/lib/application-lifecycle";
 import { startFunction } from "@/lib/dashboard-functions";
 import { dashboardGoogle } from "@/lib/dashboard-google";
@@ -222,14 +223,29 @@ function ReviewActions({ application, sendingAllowed }: { application: Applicati
   );
 }
 
-function Person({ name, profileUrl, headline, children }: { name: string; profileUrl: string; headline: string; children?: ReactNode }) {
+function Person({
+  name,
+  profileUrl,
+  headline,
+  photo,
+  children,
+}: {
+  name: string;
+  profileUrl: string;
+  headline: string;
+  photo: string | null;
+  children?: ReactNode;
+}) {
   return (
-    <div className="min-w-0 flex-1">
-      <ExternalLink href={profileUrl} className="font-medium hover:underline">
-        {name}
-      </ExternalLink>
-      <p className="truncate text-sm text-muted">{headline}</p>
-      {children}
+    <div className="flex min-w-0 flex-1 items-start gap-3">
+      <Avatar name={name} photo={photo} />
+      <div className="min-w-0 flex-1">
+        <ExternalLink href={profileUrl} className="font-medium hover:underline">
+          {name}
+        </ExternalLink>
+        <p className="truncate text-sm text-muted">{headline}</p>
+        {children}
+      </div>
     </div>
   );
 }
@@ -314,8 +330,8 @@ export default async function ApplicationPage({
                 {job.title}
               </ExternalLink>
             </h1>
-            <p className="text-sm text-fg-2">
-              {companyName} · {job.location} · {sourceName(job.source)}
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-fg-2">
+              {companyName} · {job.location} <SourceBadge source={job.source} />
             </p>
           </>
         )}

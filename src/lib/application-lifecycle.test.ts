@@ -508,6 +508,7 @@ const person = (name: string): Person => ({
   name,
   headline: `${name} at Acme`,
   profileUrl: `https://www.linkedin.com/in/${name.toLowerCase().replace(" ", "-")}`,
+  photo: null,
 });
 
 const search = (jobFunction: JobFunction): EmployeeSearch => ({ companyUrl: acmePage.url, jobFunction, maxEmployees: 4 });

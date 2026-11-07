@@ -134,6 +134,13 @@
       "when": 1794057986201,
       "tag": "0018_llm_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794071879383,
+      "tag": "0019_decision_maker_photo",
+      "breakpoints": true
     }
   ]
 }
