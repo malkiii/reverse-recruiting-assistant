@@ -5,9 +5,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
-import { sourceName, STEP_NAMES } from "@/components/status";
+import { STEP_NAMES } from "@/components/status";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Card, CardHeader, DetailList, dateTime, ExternalLink, linkClass, StatusBadge, Tag } from "@/components/ui";
+import { Alert, Card, CardHeader, DetailList, dateTime, ExternalLink, linkClass, SourceBadge, StatusBadge, Tag } from "@/components/ui";
 import { applicationAsOf, cancel, edit, type EditResult, removeDecisionMaker } from "@/lib/application-lifecycle";
 import { startFunction } from "@/lib/dashboard-functions";
 import { dashboardGoogle } from "@/lib/dashboard-google";
@@ -330,8 +330,8 @@ export default async function ApplicationPage({
                 {job.title}
               </ExternalLink>
             </h1>
-            <p className="text-sm text-fg-2">
-              {companyName} · {job.location} · {sourceName(job.source)}
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-fg-2">
+              {companyName} · {job.location} <SourceBadge source={job.source} />
             </p>
           </>
         )}
