@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ApplicationStatus } from "@/lib/gateways";
 import { sourceName, sourceTone, STATUS_LABELS, statusTone } from "./status";
+import { TableLink } from "./table-transition";
 
 export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(" ");
 
@@ -182,9 +183,9 @@ export function Pagination({ page, pages, href }: { page: number; pages: number;
   return (
     <nav aria-label="Pagination" className="mt-4 flex items-center justify-between gap-3">
       {page > 1 ? (
-        <Link href={href(page - 1)} scroll={false} className={linkClassName}>
+        <TableLink href={href(page - 1)} className={linkClassName}>
           ‹ Previous
-        </Link>
+        </TableLink>
       ) : (
         <span aria-disabled="true" className={disabledClassName}>
           ‹ Previous
@@ -194,9 +195,9 @@ export function Pagination({ page, pages, href }: { page: number; pages: number;
         Page {page} of {pages}
       </span>
       {page < pages ? (
-        <Link href={href(page + 1)} scroll={false} className={linkClassName}>
+        <TableLink href={href(page + 1)} className={linkClassName}>
           Next ›
-        </Link>
+        </TableLink>
       ) : (
         <span aria-disabled="true" className={disabledClassName}>
           Next ›
@@ -205,6 +206,12 @@ export function Pagination({ page, pages, href }: { page: number; pages: number;
     </nav>
   );
 }
+
+export const segmentClass = (active: boolean) =>
+  cx(
+    "inline-flex h-8 items-center gap-1.5 rounded-xs px-3 text-[13px] font-medium whitespace-nowrap transition",
+    active ? "bg-subtle text-fg ring-1 ring-line-strong" : "text-muted hover:text-fg",
+  );
 
 /** A horizontal row of options, each a link, such as status filters or stats ranges. */
 export function Segmented({
@@ -231,12 +238,7 @@ export function Segmented({
               replace
               scroll={false}
               aria-current={option.active ? "page" : undefined}
-              className={cx(
-                "inline-flex h-8 items-center gap-1.5 rounded-xs px-3 text-[13px] font-medium whitespace-nowrap transition",
-                option.active
-                  ? "bg-subtle text-fg ring-1 ring-line-strong"
-                  : "text-muted hover:text-fg",
-              )}
+              className={segmentClass(option.active)}
             >
               {option.label}
             </Link>

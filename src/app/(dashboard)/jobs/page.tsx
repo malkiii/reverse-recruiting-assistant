@@ -6,7 +6,8 @@ import { connection } from "next/server";
 import { SidePanel, SidePanelToggle } from "@/components/side-panel";
 import { SubmitButton } from "@/components/submit-button";
 import { sourceName } from "@/components/status";
-import { FilterInput, FilterSelect } from "@/components/table-filters";
+import { FilterInput, FilterSegmented, FilterSelect } from "@/components/table-filters";
+import { TableResults, TableTransition } from "@/components/table-transition";
 import {
   Alert,
   Card,
@@ -17,7 +18,6 @@ import {
   PageHeader,
   Pagination,
   percent,
-  Segmented,
   shortDate,
   SourceBadge,
   StatTile,
@@ -35,6 +35,7 @@ import {
 import { parseDashboardEnv } from "@/lib/env";
 import { isCollectionActive } from "@/lib/job-collection";
 import {
+  APPLICATION_FILTERS,
   type ApplicationFilter,
   hasJobFilters,
   type JobFilters,
@@ -125,11 +126,6 @@ const jobsHref = (filters: JobFilters, page?: number) =>
   });
 
 function JobFilterBar({ filters, sources, companies }: { filters: JobFilters; sources: string[]; companies: string[] }) {
-  const toggleSource = (source: string) =>
-    filters.sources.includes(source)
-      ? filters.sources.filter((chosen) => chosen !== source)
-      : [...filters.sources, source];
-
   return (
     <div className="mb-4 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -139,25 +135,21 @@ function JobFilterBar({ filters, sources, companies }: { filters: JobFilters; so
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {sources.length > 1 && (
-          <Segmented
-            inline
+          <FilterSegmented
+            name="source"
             label="Filter by source"
+            multiple
             options={[
-              { href: jobsHref({ ...filters, sources: [] }), active: filters.sources.length === 0, label: "All sources" },
-              ...sources.map((source) => ({
-                href: jobsHref({ ...filters, sources: toggleSource(source) }),
-                active: filters.sources.includes(source),
-                label: sourceName(source),
-              })),
+              { value: "", label: "All sources" },
+              ...sources.map((source) => ({ value: source, label: sourceName(source) })),
             ]}
           />
         )}
-        <Segmented
-          inline
+        <FilterSegmented
+          name="application"
           label="Filter by Application"
-          options={(["any", "none", "prepared"] as const).map((application) => ({
-            href: jobsHref({ ...filters, application }),
-            active: filters.application === application,
+          options={APPLICATION_FILTERS.map((application) => ({
+            value: application === "any" ? "" : application,
             label: APPLICATION_LABELS[application],
           }))}
         />
@@ -221,88 +213,92 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      {(filtered || jobs.length > 0) && (
-        <JobFilterBar filters={filters} sources={options.sources} companies={options.companies} />
-      )}
+      <TableTransition>
+        {(filtered || jobs.length > 0) && (
+          <JobFilterBar filters={filters} sources={options.sources} companies={options.companies} />
+        )}
 
-      {jobs.length === 0 ? (
-        filtered ? (
-          <EmptyState title="No matching Jobs">
-            <Link href="/jobs" className={linkClass}>
-              Clear filters
-            </Link>
-          </EmptyState>
-        ) : (
-          <EmptyState title="No Jobs yet">
-            Run a Job Collection, or turn on a Job Board or Job Feed in Collection settings, the side panel.
-          </EmptyState>
-        )
-      ) : (
-        <>
-          <ul className="space-y-3 md:hidden">
-            {jobs.map((job) => (
-              <li key={job.url}>
-                <Card className={cx("p-4", hasApplication(job) && "relative active:bg-subtle")}>
-                  <ExternalLink href={job.url} className="relative z-10 block text-base leading-snug font-semibold">
-                    {job.title}
-                  </ExternalLink>
-                  <p className="mt-1 text-sm text-fg-2">
-                    <CompanyName job={job} />
-                  </p>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
-                    {job.location} · {shortDate(job.postDay, TIMEZONE)} <SourceBadge source={job.source} />
-                  </p>
-                  <div className="mt-3">
-                    <ApplicationCell job={job} block />
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
-
-          <Card className="hidden md:block">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line text-[11px] tracking-wide text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">Job</th>
-                  <th className="px-4 py-2.5 font-medium">Location</th>
-                  <th className="px-4 py-2.5 font-medium">Posted</th>
-                  <th className="px-4 py-2.5 font-medium">Source</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Application</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
+        <TableResults>
+          {jobs.length === 0 ? (
+            filtered ? (
+              <EmptyState title="No matching Jobs">
+                <Link href="/jobs" className={linkClass}>
+                  Clear filters
+                </Link>
+              </EmptyState>
+            ) : (
+              <EmptyState title="No Jobs yet">
+                Run a Job Collection, or turn on a Job Board or Job Feed in Collection settings, the side panel.
+              </EmptyState>
+            )
+          ) : (
+            <>
+              <ul className="space-y-3 md:hidden">
                 {jobs.map((job) => (
-                  <tr
-                    key={job.url}
-                    className={cx("hover:bg-subtle", hasApplication(job) && "relative cursor-pointer")}
-                  >
-                    <td className="max-w-80 px-4 py-3">
-                      <ExternalLink href={job.url} className="relative z-10 font-medium hover:underline">
+                  <li key={job.url}>
+                    <Card className={cx("p-4", hasApplication(job) && "relative active:bg-subtle")}>
+                      <ExternalLink href={job.url} className="relative z-10 block text-base leading-snug font-semibold">
                         {job.title}
                       </ExternalLink>
-                      <div className="text-muted">
+                      <p className="mt-1 text-sm text-fg-2">
                         <CompanyName job={job} />
+                      </p>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
+                        {job.location} · {shortDate(job.postDay, TIMEZONE)} <SourceBadge source={job.source} />
+                      </p>
+                      <div className="mt-3">
+                        <ApplicationCell job={job} block />
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-fg-2">{job.location}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-fg-2">
-                      {shortDate(job.postDay, TIMEZONE)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <SourceBadge source={job.source} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <ApplicationCell job={job} />
-                    </td>
-                  </tr>
+                    </Card>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </Card>
-          <Pagination page={page} pages={pages} href={(target) => jobsHref(filters, target)} />
-        </>
-      )}
+              </ul>
+
+              <Card className="hidden md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line text-[11px] tracking-wide text-muted uppercase">
+                    <tr>
+                      <th className="px-4 py-2.5 font-medium">Job</th>
+                      <th className="px-4 py-2.5 font-medium">Location</th>
+                      <th className="px-4 py-2.5 font-medium">Posted</th>
+                      <th className="px-4 py-2.5 font-medium">Source</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Application</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {jobs.map((job) => (
+                      <tr
+                        key={job.url}
+                        className={cx("hover:bg-subtle", hasApplication(job) && "relative cursor-pointer")}
+                      >
+                        <td className="max-w-80 px-4 py-3">
+                          <ExternalLink href={job.url} className="relative z-10 font-medium hover:underline">
+                            {job.title}
+                          </ExternalLink>
+                          <div className="text-muted">
+                            <CompanyName job={job} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-fg-2">{job.location}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-fg-2">
+                          {shortDate(job.postDay, TIMEZONE)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <SourceBadge source={job.source} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <ApplicationCell job={job} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+              <Pagination page={page} pages={pages} href={(target) => jobsHref(filters, target)} />
+            </>
+          )}
+        </TableResults>
+      </TableTransition>
     </>
   );
 }
