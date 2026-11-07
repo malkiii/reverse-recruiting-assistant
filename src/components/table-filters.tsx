@@ -1,38 +1,40 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
-import { cx, inputClass } from "./ui";
+import { useSearchParams } from "next/navigation";
+import { type ReactNode, useEffect, useRef } from "react";
+import { TableLink, useTableNavigation } from "./table-transition";
+import { cx, inputClass, segmentClass } from "./ui";
 
-const DEBOUNCE_MS = 300;
+/** The path with these params, back on page 1. */
+function hrefWith(pathname: string, params: URLSearchParams) {
+  const next = new URLSearchParams(params);
+  next.delete("page");
+  const query = next.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
 
 /** Sets a URL param, or removes it when empty, and goes back to page 1. */
 function useSetParam(name: string) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const { params, pathname, navigate } = useTableNavigation();
   return (value: string) => {
-    const params = new URLSearchParams(searchParams);
-    if (value) params.set(name, value);
-    else params.delete(name);
-    params.delete("page");
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    const next = new URLSearchParams(params);
+    if (value) next.set(name, value);
+    else next.delete(name);
+    navigate(hrefWith(pathname, next));
   };
 }
 
-/** A text filter that updates the URL a moment after typing stops. */
+/** A text filter that updates the URL when the Admin presses Enter. */
 export function FilterInput({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
   const value = useSearchParams().get(name) ?? "";
+  const { params } = useTableNavigation();
   const setParam = useSetParam(name);
   const input = useRef<HTMLInputElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Follows the URL when it changes elsewhere, such as Clear filters, but not under the Admin's typing.
   useEffect(() => {
     if (input.current && document.activeElement !== input.current) input.current.value = value;
   }, [value]);
-  useEffect(() => () => clearTimeout(timer.current), []);
 
   return (
     <input
@@ -41,10 +43,11 @@ export function FilterInput({ name, label, placeholder }: { name: string; label:
       aria-label={label}
       placeholder={placeholder}
       defaultValue={value}
-      onChange={(event) => {
-        const next = event.target.value.trim();
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => setParam(next), DEBOUNCE_MS);
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const next = event.currentTarget.value.trim();
+        if (next !== (params.get(name) ?? "")) setParam(next);
       }}
       className={cx(inputClass, "sm:w-56")}
     />
@@ -63,7 +66,7 @@ export function FilterSelect({
   emptyLabel: string;
   options: string[];
 }) {
-  const value = useSearchParams().get(name) ?? "";
+  const value = useTableNavigation().params.get(name) ?? "";
   const setParam = useSetParam(name);
   // A value no longer offered, such as a cleaned-up Company, still shows as chosen.
   const shown = value && !options.includes(value) ? [value, ...options] : options;
@@ -82,5 +85,60 @@ export function FilterSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * A row of filter options for one param. The option with an empty value removes the param.
+ * With `multiple`, the other options toggle in and out of the param instead of replacing it.
+ */
+export function FilterSegmented({
+  name,
+  label,
+  options,
+  multiple = false,
+}: {
+  name: string;
+  label: string;
+  options: { value: string; label: ReactNode }[];
+  multiple?: boolean;
+}) {
+  const { params, pathname } = useTableNavigation();
+  const chosen = params.getAll(name);
+
+  const hrefFor = (value: string) => {
+    const next = new URLSearchParams(params);
+    next.delete(name);
+    const values = !value
+      ? []
+      : !multiple
+        ? [value]
+        : chosen.includes(value)
+          ? chosen.filter((item) => item !== value)
+          : [...chosen, value];
+    for (const item of values) next.append(name, item);
+    return hrefWith(pathname, next);
+  };
+
+  return (
+    <nav aria-label={label}>
+      <ul className="flex w-max gap-0.5 rounded-sm border border-line bg-surface p-0.5">
+        {options.map((option) => {
+          const active = option.value ? chosen.includes(option.value) : chosen.length === 0;
+          return (
+            <li key={option.value}>
+              <TableLink
+                href={hrefFor(option.value)}
+                replace
+                aria-current={active ? "page" : undefined}
+                className={segmentClass(active)}
+              >
+                {option.label}
+              </TableLink>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
