@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type FilterStorage, saveFilters, tabHref } from "@/lib/saved-filters";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -71,9 +72,36 @@ function activeTab(pathname: string) {
 
 const HOW_IT_WORKS = "/how-it-works";
 
+const NO_STORAGE: FilterStorage = { getItem: () => null, setItem: () => {} };
+
+/** The browser's storage; reading it throws when site data is blocked. */
+function browserStorage(): FilterStorage {
+  try {
+    return window.localStorage;
+  } catch {
+    return NO_STORAGE;
+  }
+}
+
+/** Each tab's link, with the filters last used on it once the browser's storage has been read. */
+function useTabHrefs(pathname: string) {
+  const searchParams = useSearchParams();
+  const [hrefs, setHrefs] = useState<Record<string, string>>({});
+  const from = useRef<string | null>(null);
+  useEffect(() => {
+    const storage = browserStorage();
+    saveFilters(storage, pathname, searchParams, from.current);
+    from.current = pathname;
+    setHrefs(Object.fromEntries(TABS.map(({ href }) => [href, tabHref(storage, href)])));
+  }, [pathname, searchParams]);
+  return (tab: string) => hrefs[tab] ?? tab;
+}
+
 /** A left sidebar on desktop and a bottom tab bar on phones. */
 export function Nav({ dark }: { dark: boolean }) {
-  const active = activeTab(usePathname());
+  const pathname = usePathname();
+  const active = activeTab(pathname);
+  const hrefOf = useTabHrefs(pathname);
   // Phones reach How it works from Settings.
   const activeOnPhone = active === HOW_IT_WORKS ? "/settings" : active;
 
@@ -89,7 +117,7 @@ export function Nav({ dark }: { dark: boolean }) {
             {TABS.map((tab) => (
               <li key={tab.href}>
                 <Link
-                  href={tab.href}
+                  href={hrefOf(tab.href)}
                   aria-current={active === tab.href ? "page" : undefined}
                   className={`relative flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-[13px] font-medium transition ${
                     active === tab.href ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"
@@ -134,7 +162,7 @@ export function Nav({ dark }: { dark: boolean }) {
           {TABS.map((tab) => (
             <li key={tab.href}>
               <Link
-                href={tab.href}
+                href={hrefOf(tab.href)}
                 aria-current={activeOnPhone === tab.href ? "page" : undefined}
                 className={`flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95 ${
                   activeOnPhone === tab.href ? "text-fg" : "text-faint"
