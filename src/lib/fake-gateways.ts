@@ -25,6 +25,7 @@ import type {
   GmailGateway,
   PdfReader,
   JobPageReader,
+  LlmApiKeys,
   LlmChoice,
   LlmGateway,
   LlmRequest,
@@ -59,7 +60,7 @@ import type {
   TelegramGateway,
   TelegramLink,
 } from "./gateways";
-import { COLLECT_JOBS, type JobSearch, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR } from "./schema";
+import { COLLECT_JOBS, type JobSearch, type LlmProvider, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR } from "./schema";
 
 export class FakeFunctionRunStore implements FunctionRunStore {
   private runs: FunctionRun[] = [];
@@ -519,7 +520,10 @@ export class FakePdfReader implements PdfReader {
 }
 
 export class FakeLlmSettingsStore implements LlmSettingsStore {
-  constructor(public choice?: LlmChoice) {}
+  constructor(
+    public choice?: LlmChoice,
+    public keys: LlmApiKeys = {},
+  ) {}
 
   async get() {
     return this.choice;
@@ -527,6 +531,19 @@ export class FakeLlmSettingsStore implements LlmSettingsStore {
 
   async save(choice: LlmChoice) {
     this.choice = choice;
+  }
+
+  async apiKeys() {
+    return { ...this.keys };
+  }
+
+  async saveApiKey(provider: LlmProvider, apiKey: string) {
+    this.keys[provider] = apiKey;
+  }
+
+  async removeApiKey(provider: LlmProvider) {
+    delete this.keys[provider];
+    if (this.choice?.provider === provider) this.choice = undefined;
   }
 }
 
