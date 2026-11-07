@@ -12,6 +12,7 @@ import {
   addDecisionMaker,
   applicationAsOf,
   cancel,
+  deleteApplication,
   edit,
   type EditResult,
   removeDecisionMaker,
@@ -33,7 +34,7 @@ import { runAsOf } from "@/lib/function-runs";
 import type { Application, DriveFile, StepLog } from "@/lib/gateways";
 import { GoogleConnectionError } from "@/lib/google-connection";
 import { resumesIn } from "@/lib/resumes";
-import { PREPARE_APPLICATION, SEND_APPLICATION } from "@/lib/schema";
+import { PREPARE_APPLICATION, SEND_APPLICATION, WORKING_STATUSES } from "@/lib/schema";
 import { CoverLetterCard } from "./cover-letter-card";
 
 const applicationPath = (applicationId: number) => `/applications/${applicationId}`;
@@ -66,6 +67,26 @@ async function cancelApplication(formData: FormData) {
   // False when it's no longer in Review, such as after a double click, which the refreshed page shows.
   await cancel({ applications: applicationStore() }, applicationId);
   backToApplication(applicationId);
+}
+
+async function deleteApplicationAction(formData: FormData) {
+  "use server";
+
+  const applicationId = Number(formData.get("applicationId"));
+  const { DATABASE_URL } = parseDashboardEnv(process.env);
+  const deleted = await deleteApplication(
+    {
+      applications: applicationStore(),
+      runs: drizzleFunctionRunStore(DATABASE_URL),
+      stepLogs: drizzleStepLogStore(DATABASE_URL),
+      now: () => new Date(),
+    },
+    applicationId,
+  );
+  if (!deleted) backToApplication(applicationId, "A Function is working on this Application, so it can't be deleted");
+  revalidatePath("/jobs");
+  revalidatePath("/applications");
+  redirect("/applications");
 }
 
 async function saveReview(formData: FormData) {
@@ -167,10 +188,23 @@ const LOG_STATUS_CLASSES = {
   stopped: "text-muted",
 };
 
-/** Each attempt at each step, oldest first, collapsed. A running attempt whose Function was killed shows as failed. */
-function StepLogs({ logs, stalled, timeZone }: { logs: StepLog[]; stalled: boolean; timeZone: string }) {
+/**
+ * Each attempt at each step, oldest first, open while a Function is working on the Application and collapsed after.
+ * A running attempt whose Function was killed shows as failed.
+ */
+function StepLogs({
+  logs,
+  stalled,
+  open,
+  timeZone,
+}: {
+  logs: StepLog[];
+  stalled: boolean;
+  open: boolean;
+  timeZone: string;
+}) {
   return (
-    <details className="group overflow-hidden rounded-md border border-line bg-surface">
+    <details open={open} className="group overflow-hidden rounded-md border border-line bg-surface">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         Step Logs <span className="text-xs font-normal text-muted">{logs.length}</span>
       </summary>
@@ -306,6 +340,7 @@ export default async function ApplicationPage({
   const stalled = application !== saved;
   // Refreshes only while a Function is working on it, so a killed Function doesn't refresh forever.
   const working = runs.some((run) => runAsOf(run, now).status === "running");
+  const removable = !(WORKING_STATUSES as readonly string[]).includes(application.status);
   const sending = application.status === "sending" || application.status === "sent" || application.currentStep === "send";
   const { decisionMakers, alsoFound } = groupPeople(people, recipients, now);
   const companyName = company?.name ?? job?.companyName;
@@ -319,8 +354,7 @@ export default async function ApplicationPage({
       </ExternalLink>,
     ]);
   if (application.jobLocation) companyDetails.push(["Job location", application.jobLocation]);
-  if (application.industryKeywords && application.industryKeywords.length > 0)
-    companyDetails.push(["Industry", application.industryKeywords.join(", ")]);
+  if (application.industry) companyDetails.push(["Industry", application.industry]);
   if (application.resumeLink)
     companyDetails.push([
       "Resume",
@@ -480,14 +514,39 @@ export default async function ApplicationPage({
         />
       )}
 
-      {logs.length > 0 && <StepLogs logs={logs} stalled={stalled} timeZone={TIMEZONE} />}
+      {logs.length > 0 && (
+        <StepLogs
+          // Remounted when the Application ends, so the logs collapse then.
+          key={removable ? "ended" : "working"}
+          logs={logs}
+          stalled={stalled}
+          open={!removable}
+          timeZone={TIMEZONE}
+        />
+      )}
 
-      {runs.length > 0 && (
-        <p className="text-sm">
-          <Link href="/function-runs" className={linkClass}>
-            Function runs
-          </Link>
-        </p>
+      {(runs.length > 0 || removable) && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {runs.length > 0 ? (
+            <Link href="/function-runs" className={`text-sm ${linkClass}`}>
+              Function runs
+            </Link>
+          ) : (
+            <span />
+          )}
+          {removable && (
+            <form action={deleteApplicationAction}>
+              <HiddenId application={application} />
+              <SubmitButton
+                variant="secondary"
+                pendingText="Deleting…"
+                confirm="Delete this Application, with its Cover Letter and Step Logs? Its Job can then be Prepared again."
+              >
+                Delete
+              </SubmitButton>
+            </form>
+          )}
+        </div>
       )}
 
       {/* Room for the fixed Send and Cancel bar on phones. */}

@@ -26,6 +26,9 @@ export const RETRIED_AFTER_TIME_LIMIT_ERROR = "Passed its time limit, then retri
 export const LLM_PROVIDERS = ["claude", "gemini", "openai", "groq"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
+/** The statuses a Function is working in, so the Application can't be deleted. */
+export const WORKING_STATUSES = ["preparing", "sending"] as const;
+
 export const APPLICATION_STATUSES = [
   "preparing",
   "in-review",
@@ -228,7 +231,8 @@ export const applications = pgTable("applications", {
   error: text(),
   /** The Job page as markdown, kept so a Retry doesn't pay to read it again. */
   jobPage: text("job_page"),
-  industryKeywords: jsonb("industry_keywords").$type<string[]>(),
+  /** The hiring Company's one main industry, as a keyword. */
+  industry: text(),
   jobLocation: text("job_location"),
   jobSummary: text("job_summary"),
   resumeFileId: text("resume_file_id"),

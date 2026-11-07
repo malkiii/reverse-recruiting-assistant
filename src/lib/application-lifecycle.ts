@@ -129,6 +129,15 @@ export async function cancel({ applications }: Pick<ClaimDeps, "applications">, 
   return applications.cancel(applicationId);
 }
 
+/**
+ * The Admin's Delete: removes an Application no Function is working on, so its Job can be Prepared again.
+ * One whose Function passed its time limit is marked failed first, so it can be deleted too.
+ */
+export async function deleteApplication(deps: RetryDeps, applicationId: number) {
+  await failIfStalled(deps, applicationId);
+  return deps.applications.remove(applicationId);
+}
+
 export type EditResult = { saved: true } | { saved: false; error: string };
 
 export type ReviewEdit = { subject?: string; coverLetter?: string; resumeFileId?: string };
@@ -209,13 +218,13 @@ const xml = (tag: string, content: string) => `<${tag}>\n${content}\n</${tag}>`;
 const CHOOSE_RESUME_INSTRUCTIONS = [
   "You help a job seeker apply to a job.",
   "Read the job page and choose the one resume, by filename, whose target role fits the job best.",
-  "Also give up to 3 short industry keywords for the hiring company, the job's location as city and country",
+  "Also give the one main industry of the hiring company as a short keyword, the job's location as city and country",
   "(or 'Remote'), and a one-paragraph summary of the job's role, responsibilities and requirements.",
   "Copy resumeFilename exactly from the listed filenames.",
 ].join(" ");
 
 const chooseResumeSchema = z.object({
-  industryKeywords: z.array(z.string()),
+  industry: z.string(),
   jobLocation: z.string(),
   resumeFilename: z.string(),
   jobSummary: z.string(),
@@ -298,7 +307,7 @@ async function readJob(deps: PrepareDeps, job: SavedJob) {
   throw new Stop("The Job page couldn't be read, so apply through the Job link", "direct-apply");
 }
 
-/** LLM request 1: the Job page and the Resume filenames, for industry keywords, Job location, Resume and Job Summary. */
+/** LLM request 1: the Job page and the Resume filenames, for the industry, Job location, Resume and Job Summary. */
 async function chooseResume(deps: PrepareDeps, job: SavedJob, jobPage: string, resumes: DriveFile[]) {
   const prompt = [
     xml("job_title", job.title),
@@ -317,7 +326,7 @@ async function chooseResume(deps: PrepareDeps, job: SavedJob, jobPage: string, r
   if (!resume) throw new Stop(`The LLM chose "${chosen.resumeFilename}", which isn't one of your Resumes`);
 
   return {
-    industryKeywords: chosen.industryKeywords,
+    industry: chosen.industry.trim() || null,
     jobLocation: chosen.jobLocation,
     jobSummary: chosen.jobSummary,
     resumeFileId: resume.id,
@@ -345,7 +354,7 @@ function namesMatch(companyName: string, title: string) {
   return company !== "" && found !== "" && (company.includes(found) || found.includes(company));
 }
 
-type CompanySearchDetails = Pick<Application, "industryKeywords" | "jobLocation">;
+type CompanySearchDetails = Pick<Application, "industry" | "jobLocation">;
 
 /**
  * The Company's LinkedIn page: the one saved on the Job, otherwise a search's first result when its title matches.
@@ -355,12 +364,13 @@ async function findCompany(
   deps: PrepareDeps,
   id: number,
   job: SavedJob,
-  { industryKeywords, jobLocation }: CompanySearchDetails,
+  { industry, jobLocation }: CompanySearchDetails,
 ) {
   let linkedinUrl = job.companyLinkedinUrl;
   if (!linkedinUrl) {
-    const where = jobLocation ? ["in", jobLocation] : [];
-    const query = [job.companyName, ...(industryKeywords ?? []), ...where, "site:linkedin.com/company"].join(" ");
+    // A remote Job's location doesn't narrow down where the Company is.
+    const where = jobLocation && !/remote/i.test(jobLocation) ? ["in", jobLocation] : [];
+    const query = [job.companyName, industry, ...where, "site:linkedin.com/company"].filter(Boolean).join(" ");
     console.log(`Application ${id}: searching for the Company page: "${query}"`);
     const result = await deps.companyPageSearch.firstResult(query);
     if (!result || !namesMatch(job.companyName, result.title)) {

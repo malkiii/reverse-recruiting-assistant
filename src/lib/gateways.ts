@@ -216,6 +216,11 @@ export interface ApplicationStore {
    * False when it isn't in Review.
    */
   claimSend(id: number): Promise<boolean>;
+  /**
+   * Atomically deletes an Application no Function is working on, with its recipients and Step Logs, so its Job can be
+   * Prepared again. False when it's preparing or sending.
+   */
+  remove(id: number): Promise<boolean>;
   update(id: number, changes: ApplicationChanges): Promise<void>;
 }
 

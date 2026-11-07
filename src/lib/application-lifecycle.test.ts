@@ -3,6 +3,7 @@ import {
   addDecisionMaker,
   applicationAsOf,
   cancel,
+  deleteApplication,
   edit,
   PREPARE_TIME_LIMIT_MS,
   prepare,
@@ -64,7 +65,7 @@ const pdf = (name: string) => ({
   webViewLink: `https://drive.google.com/file/${name}`,
 });
 
-const acmeQuery = "Acme software fintech in Berlin, Germany site:linkedin.com/company";
+const acmeQuery = "Acme fintech in Berlin, Germany site:linkedin.com/company";
 const acmePage = { url: "https://www.linkedin.com/company/acme-corp", title: "ACME, Inc. | LinkedIn" };
 
 async function setup() {
@@ -118,7 +119,7 @@ test("a double click on Prepare claims only one Application for the Job", async 
 });
 
 const answer = {
-  industryKeywords: ["software", "fintech"],
+  industry: "fintech",
   jobLocation: "Berlin, Germany",
   resumeFilename: "Backend Engineer Resume.pdf",
   jobSummary: "Acme needs a backend engineer to build payment APIs in Go.",
@@ -139,7 +140,7 @@ test("Prepare uses a Job Board Job's collected description and saves the Resume 
   expect(await deps.applications.get(id)).toMatchObject({
     currentStep: "find-decision-makers",
     jobPage: "Collected description: build APIs in Go",
-    industryKeywords: ["software", "fintech"],
+    industry: "fintech",
     jobLocation: "Berlin, Germany",
     jobSummary: "Acme needs a backend engineer to build payment APIs in Go.",
     resumeFileId: "file-Backend Engineer Resume.pdf",
@@ -478,7 +479,7 @@ test("a Send whose Function passed its time limit can be retried, emailing only 
 test("company suffixes are removed only as whole words, so a name inside another Company's name doesn't match", async () => {
   const deps = await setup();
   await deps.jobs.save([{ ...linkedInJob, title: "ML Engineer", companyName: "Cohere", url: "https://www.linkedin.com/jobs/view/4" }]);
-  deps.companyPageSearch.results.set("Cohere software fintech in Berlin, Germany site:linkedin.com/company", {
+  deps.companyPageSearch.results.set("Cohere fintech in Berlin, Germany site:linkedin.com/company", {
     url: "https://www.linkedin.com/company/here",
     title: "HERE Technologies | LinkedIn",
   });
@@ -493,7 +494,7 @@ test("company suffixes are removed only as whole words, so a name inside another
 test("the match ignores company suffixes such as Inc and Ltd", async () => {
   const deps = await setup();
   await deps.jobs.save([{ ...linkedInJob, title: "SRE", companyName: "Initech Inc", url: "https://www.linkedin.com/jobs/view/4" }]);
-  deps.companyPageSearch.results.set("Initech Inc software fintech in Berlin, Germany site:linkedin.com/company", {
+  deps.companyPageSearch.results.set("Initech Inc fintech in Berlin, Germany site:linkedin.com/company", {
     url: "https://www.linkedin.com/company/initech",
     title: "Initech Ltd | LinkedIn",
   });
@@ -960,6 +961,39 @@ test("only an Application in Review can be cancelled", async () => {
 
   expect(await cancel(deps, id)).toBe(false);
   expect(await deps.applications.get(id)).toMatchObject({ status: "preparing" });
+});
+
+test("Delete removes an Application and its recipients, so the Job can be Prepared again", async () => {
+  const deps = await setup();
+  await saveAcmePeople(deps);
+  deps.fakeLlm.answers.push(answer, letter);
+  const id = (await prepare(deps, 1))!;
+  await runPreparation(deps, id);
+
+  expect(await deleteApplication(deps, id)).toBe(true);
+
+  expect(await deps.applications.get(id)).toBeUndefined();
+  expect(await deps.decisionMakers.listForApplication(id)).toEqual([]);
+  expect(await prepare(deps, 1)).not.toBeNull();
+});
+
+test("an Application a Function is working on can't be deleted", async () => {
+  const deps = await setup();
+  const id = (await prepare(deps, 1))!;
+
+  expect(await deleteApplication(deps, id)).toBe(false);
+  expect(await deps.applications.get(id)).toMatchObject({ status: "preparing" });
+});
+
+test("a remote Job's location is left out of the Company page search", async () => {
+  const deps = await setup();
+  deps.companyPageSearch.results.set("Acme fintech site:linkedin.com/company", acmePage);
+  deps.fakeLlm.answers.push({ ...answer, jobLocation: "Remote (EU)" });
+  const id = (await prepare(deps, 1))!;
+
+  await runPreparation(deps, id);
+
+  expect(deps.companyPageSearch.queries).toEqual(["Acme fintech site:linkedin.com/company"]);
 });
 
 /** Prepares the LinkedIn Job to Review, with Ann and Bob, already saved at Acme, as its Decision Makers. */

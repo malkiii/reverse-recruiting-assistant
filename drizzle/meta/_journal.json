@@ -141,6 +141,13 @@
       "when": 1794071879383,
       "tag": "0019_decision_maker_photo",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794081055727,
+      "tag": "0020_application_industry",
+      "breakpoints": true
     }
   ]
 }
