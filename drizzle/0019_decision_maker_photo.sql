@@ -1,0 +1,1 @@
+ALTER TABLE "decision_makers" ADD COLUMN "photo" text;

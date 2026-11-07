@@ -203,6 +203,8 @@ export const decisionMakers = pgTable(
     name: text().notNull(),
     headline: text().notNull(),
     profileUrl: text("profile_url").notNull(),
+    /** Their LinkedIn photo URL, which LinkedIn expires after some weeks. */
+    photo: text(),
     email: text(),
     jobFunction: text("job_function", { enum: JOB_FUNCTIONS }).notNull(),
     foundAt: timestamp("found_at", { withTimezone: true }).notNull(),

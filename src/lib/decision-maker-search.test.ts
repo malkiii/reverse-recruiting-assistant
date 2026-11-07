@@ -12,6 +12,7 @@ const person = (name: string, overrides: Partial<DecisionMaker> = {}): DecisionM
   name,
   headline: `${name}'s headline`,
   profileUrl: `https://linkedin.com/in/${name}`,
+  photo: null,
   email: `${name}@acme.com`,
   jobFunction: "12",
   foundAt: daysAgo(10),

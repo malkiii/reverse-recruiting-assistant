@@ -9,6 +9,7 @@ const employeeSchema = z.object({
   name: z.string(),
   headline: z.string().nullish(),
   profileUrl: z.string(),
+  image: z.string().nullish(),
 });
 
 const emailSchema = z.object({
@@ -31,10 +32,11 @@ export const apifyEmployeesActor: EmployeesActor = {
   status: actorRunStatus,
 
   results(run) {
-    return actorRunItems(run, employeeSchema, ({ name, headline, profileUrl }) => ({
+    return actorRunItems(run, employeeSchema, ({ name, headline, profileUrl, image }) => ({
       name,
       headline: headline ?? "",
       profileUrl,
+      photo: image?.trim() || null,
     }));
   },
 };

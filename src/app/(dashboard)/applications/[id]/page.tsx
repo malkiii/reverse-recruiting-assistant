@@ -1,4 +1,5 @@
 import { AutoRefresh } from "@/components/auto-refresh";
+import { Avatar } from "@/components/avatar";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -222,14 +223,29 @@ function ReviewActions({ application, sendingAllowed }: { application: Applicati
   );
 }
 
-function Person({ name, profileUrl, headline, children }: { name: string; profileUrl: string; headline: string; children?: ReactNode }) {
+function Person({
+  name,
+  profileUrl,
+  headline,
+  photo,
+  children,
+}: {
+  name: string;
+  profileUrl: string;
+  headline: string;
+  photo: string | null;
+  children?: ReactNode;
+}) {
   return (
-    <div className="min-w-0 flex-1">
-      <ExternalLink href={profileUrl} className="font-medium hover:underline">
-        {name}
-      </ExternalLink>
-      <p className="truncate text-sm text-muted">{headline}</p>
-      {children}
+    <div className="flex min-w-0 flex-1 items-start gap-3">
+      <Avatar name={name} photo={photo} />
+      <div className="min-w-0 flex-1">
+        <ExternalLink href={profileUrl} className="font-medium hover:underline">
+          {name}
+        </ExternalLink>
+        <p className="truncate text-sm text-muted">{headline}</p>
+        {children}
+      </div>
     </div>
   );
 }

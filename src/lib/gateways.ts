@@ -258,7 +258,7 @@ export interface CompanyStore {
 export type SearchResult = { url: string; title: string };
 
 /** A person the employees actor found at a Company. */
-export type Person = { name: string; headline: string; profileUrl: string };
+export type Person = { name: string; headline: string; profileUrl: string; photo: string | null };
 export type EmployeeSearch = { companyUrl: string; jobFunction: JobFunction; maxEmployees: number };
 /** The email actor's answer for one profile. Its URL may be normalized differently from the one looked up. */
 export type FoundEmail = { profileUrl: string; email: string | null };
@@ -277,7 +277,7 @@ export type EmailsActor = ActorGateway<string[], FoundEmail>;
 export type DecisionMaker = typeof decisionMakers.$inferSelect;
 /** A Decision Maker an Application emails, and when their email went out. */
 export type Recipient = DecisionMaker & { sentAt: Date | null };
-export type FoundPerson = Pick<DecisionMaker, "name" | "headline" | "profileUrl" | "email" | "jobFunction">;
+export type FoundPerson = Pick<DecisionMaker, "name" | "headline" | "profileUrl" | "photo" | "email" | "jobFunction">;
 
 export interface DecisionMakerStore {
   /**
