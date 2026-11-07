@@ -3,6 +3,7 @@ import type { CollectedJob, JobFeedReader } from "./gateways";
 
 const SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
 const TIMEOUT_MS = 120_000;
+const MAX_AGE_MS = 2 * 60 * 60 * 1000;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const PROMPT =
@@ -63,6 +64,7 @@ export function firecrawlJobFeedReader(apiKey: string): JobFeedReader {
           formats: [{ type: "json", prompt: PROMPT, schema: JOBS_SCHEMA }],
           onlyMainContent: true,
           timeout: TIMEOUT_MS,
+          maxAge: MAX_AGE_MS,
         }),
       });
       if (!response.ok) throw new Error(`Firecrawl request failed: ${response.status}`);
