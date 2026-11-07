@@ -77,7 +77,7 @@ const NO_STORAGE: FilterStorage = { getItem: () => null, setItem: () => {} };
 /** The browser's storage; reading it throws when site data is blocked. */
 function browserStorage(): FilterStorage {
   try {
-    return window.localStorage;
+    return window.sessionStorage;
   } catch {
     return NO_STORAGE;
   }

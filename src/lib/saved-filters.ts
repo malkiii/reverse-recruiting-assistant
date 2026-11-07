@@ -1,4 +1,4 @@
-/** The filters last used on each dashboard table tab, kept in the browser so the sidebar links bring them back. */
+/** The filters last used on each dashboard table tab, kept in the browser tab's session so the sidebar links bring them back. */
 
 export type FilterStorage = Pick<Storage, "getItem" | "setItem">;
 
