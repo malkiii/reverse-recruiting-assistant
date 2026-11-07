@@ -161,6 +161,12 @@ export const googleConnection = pgTable(
   singleRow,
 ).enableRLS();
 
+/** An LLM provider's API key, added by the Admin in settings and read by Functions. */
+export const llmApiKeys = pgTable("llm_api_keys", {
+  provider: text({ enum: LLM_PROVIDERS }).primaryKey(),
+  apiKey: text("api_key").notNull(),
+}).enableRLS();
+
 export const settings = pgTable(
   "settings",
   {

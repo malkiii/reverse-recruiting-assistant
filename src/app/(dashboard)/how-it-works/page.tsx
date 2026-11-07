@@ -51,7 +51,7 @@ export default function HowItWorksPage() {
       <Section id="setup" description="Do these once before your first Job Collection.">
         <Steps>
           <Step title="Choose an LLM" href="/settings" linkText="Settings">
-            Pick the provider and model used to choose a Resume and write the Cover Letter.
+            Add a provider with its API key, then pick one of the models it lets you use to choose a Resume and write the Cover Letter.
           </Step>
           <Step title="Connect Google" href="/google" linkText="Google">
             Connect Gmail, used to send, and choose the Resume Folder holding your Resume PDFs.
@@ -130,7 +130,7 @@ export default function HowItWorksPage() {
       <Section id="settings">
         <Items>
           <Item name="LLM" href="/settings">
-            The provider and model used to choose a Resume and write the Cover Letter.
+            The providers you added with their API keys, and the provider and model used to choose a Resume and write the Cover Letter.
           </Item>
           <Item name="Sending" href="/settings">
             Must be on for Send to work. While it&apos;s off, Send is refused.

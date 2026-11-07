@@ -303,9 +303,16 @@ export interface CompanyPageSearch {
 
 export type LlmChoice = { provider: LlmProvider; model: string };
 
+export type LlmApiKeys = Partial<Record<LlmProvider, string>>;
+
 export interface LlmSettingsStore {
   get(): Promise<LlmChoice | undefined>;
   save(choice: LlmChoice): Promise<void>;
+  /** The API keys the Admin added, by provider. */
+  apiKeys(): Promise<LlmApiKeys>;
+  saveApiKey(provider: LlmProvider, apiKey: string): Promise<void>;
+  /** Removes the provider's key, and the LLM choice too when it's that provider's, so Prepare doesn't use a keyless provider. */
+  removeApiKey(provider: LlmProvider): Promise<void>;
 }
 
 export interface ScheduleSettingsStore {

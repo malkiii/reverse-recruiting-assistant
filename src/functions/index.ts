@@ -107,10 +107,6 @@ export function functionServices() {
     DASHBOARD_URL,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    ANTHROPIC_API_KEY,
-    GEMINI_API_KEY,
-    OPENAI_API_KEY,
-    GROQ_API_KEY,
     DISABLE_SEND,
   } = parseFunctionsEnv(process.env);
   const now = () => new Date();
@@ -121,7 +117,6 @@ export function functionServices() {
   };
   const accessToken = () => googleAccessToken(googleConnection);
   const llmSettings = drizzleLlmSettingsStore(DATABASE_URL);
-  const llmApiKeys = { claude: ANTHROPIC_API_KEY, gemini: GEMINI_API_KEY, openai: OPENAI_API_KEY, groq: GROQ_API_KEY };
   return {
     runs: drizzleFunctionRunStore(DATABASE_URL),
     scheduleSettings: drizzleScheduleSettingsStore(DATABASE_URL),
@@ -152,7 +147,7 @@ export function functionServices() {
     decisionMakers: drizzleDecisionMakerStore(DATABASE_URL),
     resumeFolder: drizzleResumeFolderStore(DATABASE_URL),
     drive: async () => googleDrive(await accessToken()),
-    llm: async () => llmGateway(await llmSettings.get(), llmApiKeys),
+    llm: async () => llmGateway(await llmSettings.get(), await llmSettings.apiKeys()),
     pdfs: pdfReader,
     gmail: async () => googleGmail(await accessToken()),
     sendingAllowed: async () => !DISABLE_SEND && (await drizzleSendSettingsStore(DATABASE_URL).sendingAllowed()),

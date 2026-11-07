@@ -36,6 +36,7 @@ import type {
   StepLogStore,
   Company,
   CompanyStore,
+  LlmApiKeys,
   LlmChoice,
   LlmSettingsStore,
   ScheduleSettingsStore,
@@ -67,6 +68,8 @@ import {
   jobBoardSettings,
   jobFeeds,
   jobs,
+  llmApiKeys,
+  type LlmProvider,
   PASSED_TIME_LIMIT_ERROR,
   RETRIED_AFTER_TIME_LIMIT_ERROR,
   settings,
@@ -381,6 +384,25 @@ export function drizzleLlmSettingsStore(databaseUrl: string): LlmSettingsStore {
     async save({ provider, model }: LlmChoice) {
       const choice = { llmProvider: provider, llmModel: model };
       await client(databaseUrl).insert(settings).values(choice).onConflictDoUpdate({ target: settings.id, set: choice });
+    },
+
+    async apiKeys() {
+      const rows = await client(databaseUrl).select().from(llmApiKeys);
+      return Object.fromEntries(rows.map(({ provider, apiKey }) => [provider, apiKey])) as LlmApiKeys;
+    },
+
+    async saveApiKey(provider: LlmProvider, apiKey: string) {
+      await client(databaseUrl)
+        .insert(llmApiKeys)
+        .values({ provider, apiKey })
+        .onConflictDoUpdate({ target: llmApiKeys.provider, set: { apiKey } });
+    },
+
+    async removeApiKey(provider: LlmProvider) {
+      await client(databaseUrl).transaction(async (tx) => {
+        await tx.delete(llmApiKeys).where(eq(llmApiKeys.provider, provider));
+        await tx.update(settings).set({ llmProvider: null, llmModel: null }).where(eq(settings.llmProvider, provider));
+      });
     },
   };
 }

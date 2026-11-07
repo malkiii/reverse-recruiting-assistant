@@ -1,33 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import type { LlmChoice, LlmGateway, LlmRequest } from "./gateways";
-import type { LlmProvider } from "./schema";
-
-export type LlmApiKeys = Partial<Record<LlmProvider, string>>;
-
-export const LLM_PROVIDER_NAMES: Record<LlmProvider, string> = {
-  claude: "Claude",
-  gemini: "Gemini",
-  openai: "OpenAI",
-  groq: "Groq",
-};
-
-/** Suggestions shown in settings. Any model the provider serves can be typed instead. */
-export const SUGGESTED_MODELS: Record<LlmProvider, string[]> = {
-  claude: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
-  gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-  openai: ["gpt-5-mini", "gpt-5"],
-  // Groq enforces a strict JSON Schema only on these models.
-  groq: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
-};
-
-const API_KEY_VARIABLES: Record<LlmProvider, string> = {
-  claude: "ANTHROPIC_API_KEY",
-  gemini: "GEMINI_API_KEY",
-  openai: "OPENAI_API_KEY",
-  groq: "GROQ_API_KEY",
-};
+import type { LlmApiKeys, LlmChoice, LlmGateway, LlmRequest } from "./gateways";
+import { LLM_PROVIDER_NAMES } from "./llm-models";
 
 const MAX_TOKENS = 16_000;
 
@@ -116,12 +91,12 @@ function gemini(apiKey: string, model: string): LlmGateway {
   };
 }
 
-/** The LLM the Admin chose, with its API key from the environment. */
+/** The LLM the Admin chose, with the API key they added in settings. */
 export function llmGateway(choice: LlmChoice | undefined, apiKeys: LlmApiKeys): LlmGateway {
   if (!choice) throw new Error("No LLM is chosen: choose a provider and model in the dashboard's settings");
   const { provider, model } = choice;
   const apiKey = apiKeys[provider];
-  if (!apiKey) throw new Error(`${API_KEY_VARIABLES[provider]} isn't set, so ${LLM_PROVIDER_NAMES[provider]} can't be used`);
+  if (!apiKey) throw new Error(`${LLM_PROVIDER_NAMES[provider]} has no API key: add one in the dashboard's settings`);
 
   switch (provider) {
     case "claude":
