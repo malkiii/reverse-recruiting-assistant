@@ -223,8 +223,9 @@ export function Segmented({
       className={inline ? undefined : "-mx-4 mb-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0"}
     >
       <ul className="flex w-max gap-0.5 rounded-sm border border-line bg-surface p-0.5">
-        {options.map((option) => (
-          <li key={option.href}>
+        {/* Keyed by position: two options can share an href, such as "All sources" and the only chosen source. */}
+        {options.map((option, index) => (
+          <li key={index}>
             <Link
               href={option.href}
               replace
