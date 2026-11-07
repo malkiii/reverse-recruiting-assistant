@@ -75,6 +75,7 @@ import {
   settings,
   skippedApifyTokens,
   stepLogs,
+  WORKING_STATUSES,
 } from "./schema";
 import { clampPage, type JobFilters, PAGE_SIZE, pageCount } from "./table-filters";
 
@@ -511,6 +512,26 @@ export function drizzleApplicationStore(databaseUrl: string): ApplicationStore {
       return removed.length > 0;
     },
 
+    async addRecipient(id: number, decisionMakerId: number) {
+      // Only while the Application is in Review, so a Send that has started never gains a recipient.
+      const db = client(databaseUrl);
+      const added = await db
+        .insert(applicationRecipients)
+        .select(
+          db
+            .select({
+              applicationId: applications.id,
+              decisionMakerId: sql<number>`${decisionMakerId}`.as("decision_maker_id"),
+              sentAt: sql<Date | null>`null`.as("sent_at"),
+            })
+            .from(applications)
+            .where(and(eq(applications.id, id), eq(applications.status, "in-review"))),
+        )
+        .onConflictDoNothing()
+        .returning({ id: applicationRecipients.decisionMakerId });
+      return added.length > 0;
+    },
+
     async claimSend(id: number) {
       // Only an Application in Review matches, so a double click on Send claims it once.
       const claimed = await client(databaseUrl)
@@ -519,6 +540,22 @@ export function drizzleApplicationStore(databaseUrl: string): ApplicationStore {
         .where(and(eq(applications.id, id), eq(applications.status, "in-review")))
         .returning({ id: applications.id });
       return claimed.length > 0;
+    },
+
+    async remove(id: number) {
+      return client(databaseUrl).transaction(async (tx) => {
+        // Locked, so a Retry or Send can't start a Function on it while it's being deleted.
+        const [removable] = await tx
+          .select({ id: applications.id })
+          .from(applications)
+          .where(and(eq(applications.id, id), notInArray(applications.status, [...WORKING_STATUSES])))
+          .for("update");
+        if (!removable) return false;
+        await tx.delete(applicationRecipients).where(eq(applicationRecipients.applicationId, id));
+        await tx.delete(stepLogs).where(eq(stepLogs.applicationId, id));
+        await tx.delete(applications).where(eq(applications.id, id));
+        return true;
+      });
     },
 
     async update(id: number, changes: ApplicationChanges) {

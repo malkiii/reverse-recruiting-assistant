@@ -209,11 +209,18 @@ export interface ApplicationStore {
   edit(id: number, changes: ReviewChanges): Promise<boolean>;
   /** Atomically removes a Decision Maker from an Application in Review, keeping them at the Company. False when it isn't in Review. */
   removeRecipient(id: number, decisionMakerId: number): Promise<boolean>;
+  /** Atomically adds a Decision Maker to an Application in Review. False when it isn't in Review or they already are one. */
+  addRecipient(id: number, decisionMakerId: number): Promise<boolean>;
   /**
    * Atomically moves an Application from Review to sending, at the send step, so a double click on Send acts once.
    * False when it isn't in Review.
    */
   claimSend(id: number): Promise<boolean>;
+  /**
+   * Atomically deletes an Application no Function is working on, with its recipients and Step Logs, so its Job can be
+   * Prepared again. False when it's preparing or sending.
+   */
+  remove(id: number): Promise<boolean>;
   update(id: number, changes: ApplicationChanges): Promise<void>;
 }
 

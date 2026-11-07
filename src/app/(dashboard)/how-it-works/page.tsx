@@ -10,7 +10,7 @@ const STEP_DETAILS: Record<ApplicationStep, string> = {
   "choose-resume": "The LLM picks the best-fitting Resume from your Resume Folder.",
   "find-company-page": "Confirms the Company's LinkedIn page. If it can't, the Application ends in Direct Apply.",
   "find-decision-makers":
-    "Finds up to 4 Decision Makers with email addresses. If none has one, the Application ends in No Contacts.",
+    "Finds up to 5 Decision Makers with email addresses. If none has one, the Application ends in No Contacts.",
   "write-cover-letter": "Writes one Cover Letter for the Job, personalized for each Decision Maker.",
   "check-sharing": "Makes sure the Resume Folder is shared by link, so recipients can open the Resume.",
   send: "After you click Send, emails each Decision Maker from your Gmail. They then enter a 30-day Cooldown.",

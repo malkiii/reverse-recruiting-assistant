@@ -60,7 +60,7 @@ import type {
   TelegramGateway,
   TelegramLink,
 } from "./gateways";
-import { COLLECT_JOBS, type JobSearch, type LlmProvider, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR } from "./schema";
+import { COLLECT_JOBS, type JobSearch, type LlmProvider, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR, WORKING_STATUSES } from "./schema";
 
 export class FakeFunctionRunStore implements FunctionRunStore {
   private runs: FunctionRun[] = [];
@@ -359,7 +359,7 @@ export class FakeApplicationStore implements ApplicationStore {
       currentStep: "read-job",
       error: null,
       jobPage: null,
-      industryKeywords: null,
+      industry: null,
       jobLocation: null,
       jobSummary: null,
       resumeFileId: null,
@@ -415,10 +415,29 @@ export class FakeApplicationStore implements ApplicationStore {
     return true;
   }
 
+  async addRecipient(id: number, decisionMakerId: number) {
+    const application = this.applications.find((saved) => saved.id === id);
+    if (application?.status !== "in-review") return false;
+    const added = this.decisionMakers.recipients.some(
+      (recipient) => recipient.applicationId === id && recipient.decisionMakerId === decisionMakerId,
+    );
+    if (added) return false;
+    this.decisionMakers.recipients.push({ applicationId: id, decisionMakerId, sentAt: null });
+    return true;
+  }
+
   async claimSend(id: number) {
     const application = this.applications.find((saved) => saved.id === id);
     if (application?.status !== "in-review") return false;
     await this.update(id, { status: "sending", currentStep: "send" });
+    return true;
+  }
+
+  async remove(id: number) {
+    const application = this.applications.find((saved) => saved.id === id);
+    if (!application || (WORKING_STATUSES as readonly string[]).includes(application.status)) return false;
+    this.applications = this.applications.filter((saved) => saved.id !== id);
+    this.decisionMakers.recipients = this.decisionMakers.recipients.filter((recipient) => recipient.applicationId !== id);
     return true;
   }
 

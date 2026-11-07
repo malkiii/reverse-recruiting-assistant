@@ -65,7 +65,7 @@ Anyone found at a Company during the search for Decision Makers, with or without
 _Avoid_: Contact, lead, employee
 
 **Decision Maker**:
-A person at a Company chosen to receive Applications, by job function priority. A Company has at most 4 in any one Application.
+A person at a Company chosen to receive Applications, by job function priority. The search chooses at most 5 for an Application; the Admin can add more of the Company's people with emails in Review.
 _Avoid_: Contact, lead, recruiter, reach-out person
 
 **Application**:
@@ -85,8 +85,12 @@ The Admin's second approval, which emails a reviewed Application to its Decision
 _Avoid_: Submit
 
 **Cancel**:
-The Admin's final decision at Review not to send an Application. A cancelled Job cannot be Prepared again.
+The Admin's final decision at Review not to send an Application. A cancelled Job cannot be Prepared again unless its Application is Deleted.
 _Avoid_: Reject, delete
+
+**Delete**:
+The Admin's removal of an Application no Function is working on, with its recipients and Step Logs, so its Job can be Prepared again.
+_Avoid_: Remove, reset
 
 **Retry**:
 The Admin's resumption of a Failed Application from the step it failed at, skipping finished steps and anyone already emailed.
