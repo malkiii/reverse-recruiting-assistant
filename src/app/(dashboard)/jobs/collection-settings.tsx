@@ -116,14 +116,6 @@ export async function CollectionSettings() {
         </form>
       </Section>
 
-      <Section title="LinkedIn Job Board">
-        <form action={saveLinkedIn} className="space-y-3">
-          <Enabled checked={linkedIn?.enabled} />
-          <LinkedInSearches searches={linkedIn?.searches ?? []} />
-          <Save />
-        </form>
-      </Section>
-
       <Section title="Glassdoor Job Board">
         <form action={saveGlassdoor} className="space-y-3">
           <div className="flex flex-wrap gap-x-5">
@@ -145,6 +137,14 @@ export async function CollectionSettings() {
               <input name="location" placeholder="New York" defaultValue={glassdoorSearch?.location} className={inputClass} />
             </label>
           </div>
+          <Save />
+        </form>
+      </Section>
+
+      <Section title="LinkedIn Job Board">
+        <form action={saveLinkedIn} className="space-y-3">
+          <Enabled checked={linkedIn?.enabled} />
+          <LinkedInSearches searches={linkedIn?.searches ?? []} />
           <Save />
         </form>
       </Section>
