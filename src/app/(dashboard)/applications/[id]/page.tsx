@@ -35,6 +35,7 @@ import type { Application, DriveFile, StepLog } from "@/lib/gateways";
 import { GoogleConnectionError } from "@/lib/google-connection";
 import { resumesIn } from "@/lib/resumes";
 import { PREPARE_APPLICATION, SEND_APPLICATION, WORKING_STATUSES } from "@/lib/schema";
+import { CopyButton } from "@/components/copy-button";
 import { CoverLetterCard } from "./cover-letter-card";
 
 const applicationPath = (applicationId: number) => `/applications/${applicationId}`;
@@ -438,6 +439,20 @@ export default async function ApplicationPage({
         </Card>
       )}
 
+      {application.coverLetter && (
+        <CoverLetterCard
+          // A saved edit remounts it, back to read-only.
+          key={`${application.subject}\n${application.coverLetter}\n${application.resumeFileId}`}
+          applicationId={application.id}
+          subject={application.subject ?? ""}
+          coverLetter={application.coverLetter}
+          resumeFileId={application.resumeFileId}
+          resumes={resumes}
+          editable={inReview}
+          save={saveReview}
+        />
+      )}
+
       {decisionMakers.length > 0 && (
         <Card>
           <CardHeader title="Decision Makers" action={<span className="text-xs text-muted">{decisionMakers.length}</span>} />
@@ -445,7 +460,10 @@ export default async function ApplicationPage({
             {decisionMakers.map((decisionMaker) => (
               <li key={decisionMaker.id} className="flex items-start gap-3 px-4 py-3">
                 <Person {...decisionMaker}>
-                  <p className="truncate text-sm">{decisionMaker.email}</p>
+                  <div className="flex min-w-0 items-center gap-1">
+                    <p className="truncate text-sm">{decisionMaker.email}</p>
+                    {decisionMaker.email && <CopyButton text={decisionMaker.email} label="Copy email" />}
+                  </div>
                   {sending && (
                     <div className="mt-1">
                       {decisionMaker.sentAt ? (
@@ -481,7 +499,12 @@ export default async function ApplicationPage({
             {alsoFound.map((person) => (
               <li key={person.id} className="flex items-start gap-3 px-4 py-3">
                 <Person {...person}>
-                  {person.email && <p className="truncate text-sm text-fg-2">{person.email}</p>}
+                  {person.email && (
+                    <div className="flex min-w-0 items-center gap-1">
+                      <p className="truncate text-sm text-fg-2">{person.email}</p>
+                      <CopyButton text={person.email} label="Copy email" />
+                    </div>
+                  )}
                 </Person>
                 {inReview && person.reason === "not-chosen" ? (
                   <form action={addDecisionMakerAction}>
@@ -498,20 +521,6 @@ export default async function ApplicationPage({
             ))}
           </ul>
         </Card>
-      )}
-
-      {application.coverLetter && (
-        <CoverLetterCard
-          // A saved edit remounts it, back to read-only.
-          key={`${application.subject}\n${application.coverLetter}\n${application.resumeFileId}`}
-          applicationId={application.id}
-          subject={application.subject ?? ""}
-          coverLetter={application.coverLetter}
-          resumeFileId={application.resumeFileId}
-          resumes={resumes}
-          editable={inReview}
-          save={saveReview}
-        />
       )}
 
       {logs.length > 0 && (

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { buttonClass } from "@/components/button";
+import { CopyButton } from "@/components/copy-button";
 import { SubmitButton } from "@/components/submit-button";
 import { inputClass } from "@/components/ui";
+import { splitPlaceholders } from "@/lib/cover-letter-placeholders";
 import type { DriveFile } from "@/lib/gateways";
 
 /** The Cover Letter, read-only until the Admin taps Edit while it's In Review, which swaps in the form in place. */
@@ -30,10 +32,17 @@ export function CoverLetterCard({
     <section className="overflow-hidden rounded-md border border-line bg-surface">
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-line px-4 py-2">
         <h2 className="text-sm font-semibold">Cover Letter</h2>
-        {editable && !editing && (
-          <button type="button" onClick={() => setEditing(true)} className={buttonClass("ghost")}>
-            Edit
-          </button>
+        {!editing && (
+          <div className="flex gap-1">
+            <CopyButton text={coverLetter} label="Copy the Cover Letter">
+              Copy
+            </CopyButton>
+            {editable && (
+              <button type="button" onClick={() => setEditing(true)} className={buttonClass("ghost")}>
+                Edit
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -80,7 +89,17 @@ export function CoverLetterCard({
         <div className="px-4 py-4">
           <p className="text-xs font-medium text-muted">Subject</p>
           <p className="mb-4 font-medium">{subject}</p>
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">{coverLetter}</div>
+          <div className="text-sm leading-relaxed whitespace-pre-wrap">
+            {splitPlaceholders(coverLetter).map(({ text, placeholder }, index) =>
+              placeholder ? (
+                <mark key={index} className="rounded-xs bg-accent-soft px-0.5 font-mono text-[0.9em] text-accent">
+                  {text}
+                </mark>
+              ) : (
+                text
+              ),
+            )}
+          </div>
         </div>
       )}
     </section>

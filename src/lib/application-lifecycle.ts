@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NAME_PLACEHOLDER, RESUME_LINK_PLACEHOLDER } from "./cover-letter-placeholders";
 import type {
   Application,
   ApplicationChanges,
@@ -391,9 +392,6 @@ async function checkSavedPeopleCooldown(deps: PrepareDeps, job: SavedJob) {
   const reason = company ? await savedPeopleCooldownReason(deps, company.id) : null;
   if (reason) throw new Stop(reason, "all-in-cooldown");
 }
-
-const NAME_PLACEHOLDER = "{{name}}";
-const RESUME_LINK_PLACEHOLDER = "{{resume_link}}";
 
 const WRITE_COVER_LETTER_INSTRUCTIONS = [
   "You help a job seeker apply to a job by emailing the people who can hire them.",
