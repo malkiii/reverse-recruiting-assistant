@@ -896,6 +896,24 @@ test("with no saved Cover Letter instructions, LLM request 2 uses the default on
   expect(instructions).toContain("Avoid em dashes entirely.");
 });
 
+test("{{company}} in the subject and Cover Letter is filled in with the Job's company name before Review", async () => {
+  const deps = await setup();
+  await saveAcmePeople(deps);
+  deps.fakeLlm.answers.push(answer, {
+    subject: "Payment APIs for {{company}}",
+    coverLetter: "Hi {{name}},\n\nI noticed {{company}} is looking for someone who can build payment APIs.\n\n{{resume_link}}",
+  });
+  const id = (await prepare(deps, 1))!;
+
+  await runPreparation(deps, id);
+
+  expect(await deps.applications.get(id)).toMatchObject({
+    status: "in-review",
+    subject: "Payment APIs for Acme",
+    coverLetter: "Hi {{name}},\n\nI noticed Acme is looking for someone who can build payment APIs.\n\n{{resume_link}}",
+  });
+});
+
 test("saved Cover Letter instructions replace the default ones, and the writing rules still follow them", async () => {
   const deps = await setup();
   await saveAcmePeople(deps);

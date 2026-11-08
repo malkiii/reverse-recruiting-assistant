@@ -155,6 +155,13 @@
       "when": 1794139244040,
       "tag": "0021_cover_letter_instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794144814772,
+      "tag": "0022_new_default_cover_letter_instructions",
+      "breakpoints": true
     }
   ]
 }

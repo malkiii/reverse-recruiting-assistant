@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { withWritingRules } from "./cover-letter-instructions";
-import { NAME_PLACEHOLDER, RESUME_LINK_PLACEHOLDER } from "./cover-letter-placeholders";
+import { COMPANY_PLACEHOLDER, NAME_PLACEHOLDER, RESUME_LINK_PLACEHOLDER } from "./cover-letter-placeholders";
 import type {
   Application,
   ApplicationChanges,
@@ -412,8 +412,8 @@ async function readResume(deps: PrepareDeps, resumeFileId: string) {
   return markdown;
 }
 
-/** LLM request 2: the Job Summary and Resume markdown, for a subject and a Cover Letter with its placeholders. */
-async function writeCoverLetter(deps: PrepareDeps, id: number) {
+/** LLM request 2: the Job Summary and Resume markdown, for a subject and a Cover Letter with its placeholders, {{company}} filled in. */
+async function writeCoverLetter(deps: PrepareDeps, id: number, companyName: string) {
   const application = await deps.applications.get(id);
   const { jobSummary, resumeFileId } = application ?? {};
   if (!jobSummary || !resumeFileId) throw new Error(`Application ${id} has no Job Summary or Resume`);
@@ -424,13 +424,14 @@ async function writeCoverLetter(deps: PrepareDeps, id: number) {
     prompt,
     schema: writeCoverLetterSchema,
   });
-  const coverLetter = written.coverLetter.trim();
+  const withCompany = (text: string) => text.trim().replaceAll(COMPANY_PLACEHOLDER, companyName);
+  const coverLetter = withCompany(written.coverLetter);
   if (!hasPlaceholders(coverLetter)) {
     throw new Stop(
       `The LLM's Cover Letter is missing ${NAME_PLACEHOLDER} in its first line or ${RESUME_LINK_PLACEHOLDER} at its end`,
     );
   }
-  return { subject: written.subject.trim(), coverLetter };
+  return { subject: withCompany(written.subject), coverLetter };
 }
 
 /** Stops before Review when the Resume Folder isn't shared by link, so a recipient never gets a dead Resume link. */
@@ -486,8 +487,8 @@ const PREPARE_STEP_WORK: Record<
     return { result: `Chose ${choice.decisionMakers.length} Decision Maker(s): ${people}`, changes: {} };
   },
 
-  async "write-cover-letter"(deps, { id }) {
-    const written = await writeCoverLetter(deps, id);
+  async "write-cover-letter"(deps, { id }, { job }) {
+    const written = await writeCoverLetter(deps, id, job.companyName);
     return { result: `Wrote "${written.subject}"`, changes: written };
   },
 

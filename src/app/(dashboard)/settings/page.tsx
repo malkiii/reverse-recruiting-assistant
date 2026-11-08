@@ -190,7 +190,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <Section
         title="Cover Letter"
-        description="The instructions the LLM follows to write each Application's subject and Cover Letter. Keep {{name}} in the first line and {{resume_link}} at the end, or Prepare fails."
+        description="The instructions the LLM follows to write each Application's subject and Cover Letter. Keep {{name}} in the first line and {{resume_link}} at the end, or Prepare fails. {{company}} is replaced with the company name."
       >
         <form action={saveCoverLetterInstructions} className="space-y-3">
           <textarea

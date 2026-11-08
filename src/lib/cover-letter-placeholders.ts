@@ -1,5 +1,7 @@
 export const NAME_PLACEHOLDER = "{{name}}";
 export const RESUME_LINK_PLACEHOLDER = "{{resume_link}}";
+/** Filled in with the Job's company name as soon as the Cover Letter is written, so Review shows the real name. */
+export const COMPANY_PLACEHOLDER = "{{company}}";
 
 const PLACEHOLDERS = new RegExp(`(${NAME_PLACEHOLDER}|${RESUME_LINK_PLACEHOLDER})`);
 
