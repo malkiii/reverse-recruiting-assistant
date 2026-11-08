@@ -148,6 +148,13 @@
       "when": 1794081055727,
       "tag": "0020_application_industry",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794139244040,
+      "tag": "0021_cover_letter_instructions",
+      "breakpoints": true
     }
   ]
 }

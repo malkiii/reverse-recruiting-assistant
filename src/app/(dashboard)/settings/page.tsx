@@ -5,8 +5,14 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Alert, Card, CardHeader, checkboxClass, PageHeader } from "@/components/ui";
-import { cleanUpOldData, drizzleLlmSettingsStore, drizzleSendSettingsStore } from "@/lib/drizzle";
+import { Alert, Card, CardHeader, checkboxClass, inputClass, PageHeader } from "@/components/ui";
+import { DEFAULT_COVER_LETTER_INSTRUCTIONS } from "@/lib/cover-letter-instructions";
+import {
+  cleanUpOldData,
+  drizzleCoverLetterSettingsStore,
+  drizzleLlmSettingsStore,
+  drizzleSendSettingsStore,
+} from "@/lib/drizzle";
 import { parseDashboardEnv } from "@/lib/env";
 import type { LlmApiKeys } from "@/lib/gateways";
 import { LLM_PROVIDER_NAMES, listModels } from "@/lib/llm-models";
@@ -97,6 +103,16 @@ async function saveSending(formData: FormData) {
   backToSettings();
 }
 
+/** Saves the Admin's Cover Letter instructions. Reset, an empty text or the default itself goes back to the default. */
+async function saveCoverLetterInstructions(formData: FormData) {
+  "use server";
+
+  const text = String(formData.get("instructions") ?? "").trim();
+  const isDefault = formData.get("intent") === "reset" || !text || text === DEFAULT_COVER_LETTER_INSTRUCTIONS;
+  await drizzleCoverLetterSettingsStore(databaseUrl()).saveInstructions(isDefault ? null : text);
+  backToSettings();
+}
+
 async function cleanUp() {
   "use server";
 
@@ -106,11 +122,12 @@ async function cleanUp() {
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await connection();
   const llmSettings = drizzleLlmSettingsStore(databaseUrl());
-  const [{ error }, llm, apiKeys, sendingAllowed, dark] = await Promise.all([
+  const [{ error }, llm, apiKeys, sendingAllowed, savedInstructions, dark] = await Promise.all([
     searchParams,
     llmSettings.get(),
     llmSettings.apiKeys(),
     drizzleSendSettingsStore(databaseUrl()).sendingAllowed(),
+    drizzleCoverLetterSettingsStore(databaseUrl()).instructions(),
     isDarkTheme(),
   ]);
   const { models, errors: modelErrors } = await modelsByProvider(apiKeys);
@@ -169,6 +186,39 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         ) : (
           <p className="text-sm text-muted">Add a provider&apos;s API key to choose its model.</p>
         )}
+      </Section>
+
+      <Section
+        title="Cover Letter"
+        description="The instructions the LLM follows to write each Application's subject and Cover Letter. Keep {{name}} in the first line and {{resume_link}} at the end, or Prepare fails."
+      >
+        <form action={saveCoverLetterInstructions} className="space-y-3">
+          <textarea
+            // Remounts after a save or Reset, so it shows what was saved.
+            key={savedInstructions ?? ""}
+            name="instructions"
+            aria-label="Cover Letter instructions"
+            defaultValue={savedInstructions ?? DEFAULT_COVER_LETTER_INSTRUCTIONS}
+            rows={8}
+            className={`${inputClass} font-mono leading-relaxed`}
+          />
+          <div className="flex gap-2">
+            <SubmitButton variant="secondary" name="intent" value="save" pendingText="Saving…">
+              Save
+            </SubmitButton>
+            {savedInstructions !== null && (
+              <SubmitButton
+                variant="ghost"
+                name="intent"
+                value="reset"
+                pendingText="Resetting…"
+                confirm="Replace your instructions with the default ones?"
+              >
+                Reset to default
+              </SubmitButton>
+            )}
+          </div>
+        </form>
       </Section>
 
       <Section

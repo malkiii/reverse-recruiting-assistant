@@ -334,6 +334,13 @@ export interface SendSettingsStore {
   saveSendingAllowed(allowed: boolean): Promise<void>;
 }
 
+export interface CoverLetterSettingsStore {
+  /** The Cover Letter instructions the Admin saved, null for the default. */
+  instructions(): Promise<string | null>;
+  /** Null goes back to the default. */
+  saveInstructions(instructions: string | null): Promise<void>;
+}
+
 export type LlmRequest<T> = { instructions: string; prompt: string; schema: z.ZodType<T> };
 
 export interface LlmGateway {

@@ -101,6 +101,7 @@ async function setup() {
     pdfs: new FakePdfReader(),
     drive: async () => drive,
     llm: async () => llm,
+    coverLetterInstructions: async (): Promise<string | null> => null,
     now: () => now,
     // Handles for the tests.
     fakeDrive: drive,
@@ -880,6 +881,34 @@ test("once Decision Makers are found, LLM request 2 writes the subject and Cover
     subject: letter.subject,
     coverLetter: letter.coverLetter,
   });
+});
+
+test("with no saved Cover Letter instructions, LLM request 2 uses the default ones followed by the writing rules", async () => {
+  const deps = await setup();
+  await saveAcmePeople(deps);
+  deps.fakeLlm.answers.push(answer, letter);
+  const id = (await prepare(deps, 1))!;
+
+  await runPreparation(deps, id);
+
+  const { instructions } = deps.fakeLlm.requests[1];
+  expect(instructions).toMatch(/^You help a job seeker apply to a job by emailing the people who can hire them\./);
+  expect(instructions).toContain("Avoid em dashes entirely.");
+});
+
+test("saved Cover Letter instructions replace the default ones, and the writing rules still follow them", async () => {
+  const deps = await setup();
+  await saveAcmePeople(deps);
+  deps.coverLetterInstructions = async () => "Write a short letter greeting {{name}} and ending with {{resume_link}}.";
+  deps.fakeLlm.answers.push(answer, letter);
+  const id = (await prepare(deps, 1))!;
+
+  await runPreparation(deps, id);
+
+  const { instructions } = deps.fakeLlm.requests[1];
+  expect(instructions).toMatch(/^Write a short letter greeting \{\{name\}\} and ending with \{\{resume_link\}\}\.\n/);
+  expect(instructions).not.toContain("You help a job seeker apply to a job by emailing");
+  expect(instructions).toContain("Avoid em dashes entirely.");
 });
 
 test("the Cover Letter isn't written when no Decision Maker is found, so the Application doesn't pay for it", async () => {

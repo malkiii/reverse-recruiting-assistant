@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withWritingRules } from "./cover-letter-instructions";
 import { NAME_PLACEHOLDER, RESUME_LINK_PLACEHOLDER } from "./cover-letter-placeholders";
 import type {
   Application,
@@ -53,6 +54,8 @@ export type PrepareDeps = ClaimDeps &
     drive: () => Promise<DriveGateway>;
     /** The LLM the Admin chose in settings. */
     llm: () => Promise<LlmGateway>;
+    /** The Cover Letter instructions the Admin saved in settings, null for the default. */
+    coverLetterInstructions: () => Promise<string | null>;
     /** Reads the chosen Resume PDF as markdown, without the LLM. */
     pdfs: PdfReader;
     companies: CompanyStore;
@@ -393,15 +396,6 @@ async function checkSavedPeopleCooldown(deps: PrepareDeps, job: SavedJob) {
   if (reason) throw new Stop(reason, "all-in-cooldown");
 }
 
-const WRITE_COVER_LETTER_INSTRUCTIONS = [
-  "You help a job seeker apply to a job by emailing the people who can hire them.",
-  "Write an email subject and a short, specific cover letter for the job, from the job summary and the resume.",
-  "Only claim experience and skills the resume supports.",
-  `Start the first line with a greeting to ${NAME_PLACEHOLDER}, which is replaced with each recipient's name.`,
-  `End the letter with ${RESUME_LINK_PLACEHOLDER}, which is replaced with the link to the resume.`,
-  "Write plain text, without markdown.",
-].join(" ");
-
 const writeCoverLetterSchema = z.object({ subject: z.string(), coverLetter: z.string() });
 
 /** Whether a Cover Letter has {{name}} in its first line and ends with {{resume_link}}, so every email can be filled in. */
@@ -426,7 +420,7 @@ async function writeCoverLetter(deps: PrepareDeps, id: number) {
 
   const prompt = [xml("job_summary", jobSummary), xml("resume", await readResume(deps, resumeFileId))].join("\n\n");
   const written = await (await deps.llm()).generate({
-    instructions: WRITE_COVER_LETTER_INSTRUCTIONS,
+    instructions: withWritingRules(await deps.coverLetterInstructions()),
     prompt,
     schema: writeCoverLetterSchema,
   });

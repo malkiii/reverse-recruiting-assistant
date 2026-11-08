@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "cover_letter_instructions" text;

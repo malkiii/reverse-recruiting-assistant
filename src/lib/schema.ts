@@ -182,6 +182,8 @@ export const settings = pgTable(
     scheduledCollectionEnabled: boolean("scheduled_collection_enabled").notNull().default(false),
     /** Whether Send may email Decision Makers. Off until the Admin turns it on. */
     sendingAllowed: boolean("sending_allowed").notNull().default(false),
+    /** The Cover Letter's system instructions the Admin saved, null for the default. */
+    coverLetterInstructions: text("cover_letter_instructions"),
   },
   singleRow,
 ).enableRLS();

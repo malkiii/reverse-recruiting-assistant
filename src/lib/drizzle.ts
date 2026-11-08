@@ -41,6 +41,7 @@ import type {
   LlmSettingsStore,
   ScheduleSettingsStore,
   SendSettingsStore,
+  CoverLetterSettingsStore,
   ActorRunStore,
   ExcludedKeywordStore,
   FunctionRunResult,
@@ -433,6 +434,22 @@ export function drizzleSendSettingsStore(databaseUrl: string): SendSettingsStore
 
     async saveSendingAllowed(allowed: boolean) {
       const values = { sendingAllowed: allowed };
+      await client(databaseUrl).insert(settings).values(values).onConflictDoUpdate({ target: settings.id, set: values });
+    },
+  };
+}
+
+export function drizzleCoverLetterSettingsStore(databaseUrl: string): CoverLetterSettingsStore {
+  return {
+    async instructions() {
+      const [row] = await client(databaseUrl)
+        .select({ instructions: settings.coverLetterInstructions })
+        .from(settings);
+      return row?.instructions ?? null;
+    },
+
+    async saveInstructions(instructions: string | null) {
+      const values = { coverLetterInstructions: instructions };
       await client(databaseUrl).insert(settings).values(values).onConflictDoUpdate({ target: settings.id, set: values });
     },
   };

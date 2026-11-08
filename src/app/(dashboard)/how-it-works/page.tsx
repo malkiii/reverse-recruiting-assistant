@@ -132,6 +132,9 @@ export default function HowItWorksPage() {
           <Item name="LLM" href="/settings">
             The providers you added with their API keys, and the provider and model used to choose a Resume and write the Cover Letter.
           </Item>
+          <Item name="Cover Letter" href="/settings">
+            The instructions the LLM follows to write the subject and Cover Letter. Reset goes back to the default ones.
+          </Item>
           <Item name="Sending" href="/settings">
             Must be on for Send to work. While it&apos;s off, Send is refused.
           </Item>
