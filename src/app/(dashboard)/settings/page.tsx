@@ -145,8 +145,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <Card>
         <ul className="divide-y divide-line">
-          <LinkRow href="/google" title="Google" description="Gmail connection and Resume Folder" />
-          <LinkRow href="/function-runs" title="Function runs" description="Recent runs and their errors" />
+          <LinkRow href="/google" title="Google" description="The Gmail and Drive connection" />
           <LinkRow
             href="/how-it-works"
             title="How it works"

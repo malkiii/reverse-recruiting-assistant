@@ -247,7 +247,7 @@ test("the Application stops when no Resume Folder is chosen", async () => {
 
   expect(await deps.applications.get(id)).toMatchObject({
     status: "failed",
-    error: "No Resume Folder is chosen: choose one on the dashboard's Google page",
+    error: "No Resume Folder is chosen: choose one on the dashboard's Resumes page",
   });
 });
 

@@ -1,4 +1,6 @@
-/** Filters and pagination for the dashboard's Jobs and Applications tables, read from the URL. */
+/** Filters and pagination for the dashboard's tables, read from the URL. */
+
+import { inCooldown } from "./decision-maker-search";
 
 export const PAGE_SIZE = 25;
 
@@ -77,3 +79,40 @@ export function withParams(path: string, params: SearchParams) {
   const query = search.toString();
   return query ? `${path}?${query}` : path;
 }
+
+export const DECISION_MAKER_EMAIL_FILTERS = ["any", "with", "without", "cooldown"] as const;
+export type DecisionMakerEmailFilter = (typeof DECISION_MAKER_EMAIL_FILTERS)[number];
+
+export type DecisionMakerFilters = { q: string; email: DecisionMakerEmailFilter };
+
+export const parseDecisionMakerFilters = (params: SearchParams): DecisionMakerFilters => ({
+  q: one(params.q),
+  email: DECISION_MAKER_EMAIL_FILTERS.find((filter) => filter === one(params.email)) ?? "any",
+});
+
+type FilterableDecisionMaker = {
+  name: string;
+  headline: string;
+  companyName: string;
+  email: string | null;
+  lastEmailedAt: Date | null;
+};
+
+/** Decision Makers whose name, headline, Company or email has the search, and that pass the email filter. */
+export const filterDecisionMakers = <T extends FilterableDecisionMaker>(rows: T[], { q, email }: DecisionMakerFilters, now: Date) =>
+  rows.filter(
+    (row) =>
+      (!q || [row.name, row.headline, row.companyName, row.email ?? ""].some((text) => contains(text, q))) &&
+      (email === "any" ||
+        (email === "with" && row.email !== null) ||
+        (email === "without" && row.email === null) ||
+        (email === "cooldown" && inCooldown(row, now))),
+  );
+
+export type CompanyFilters = { q: string };
+
+export const parseCompanyFilters = (params: SearchParams): CompanyFilters => ({ q: one(params.q) });
+
+/** Companies whose name has the search. */
+export const filterCompanies = <T extends { name: string }>(rows: T[], { q }: CompanyFilters) =>
+  rows.filter((row) => !q || contains(row.name, q));

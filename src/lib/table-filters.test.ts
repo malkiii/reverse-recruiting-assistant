@@ -1,6 +1,11 @@
 import { expect, test } from "vitest";
 import {
+  type DecisionMakerEmailFilter,
   filterApplications,
+  filterCompanies,
+  filterDecisionMakers,
+  parseCompanyFilters,
+  parseDecisionMakerFilters,
   hasJobFilters,
   paginate,
   parseJobFilters,
@@ -55,4 +60,53 @@ test("Links leave out empty params and repeat arrays", () => {
     "/jobs?source=LinkedIn&source=Glassdoor",
   );
   expect(withParams("/jobs", {})).toBe("/jobs");
+});
+
+const person = (name: string, changes: Partial<{ headline: string; companyName: string; email: string | null; lastEmailedAt: Date | null }> = {}) => ({
+  name,
+  headline: "Engineer",
+  companyName: "Acme",
+  email: null,
+  lastEmailedAt: null,
+  ...changes,
+});
+
+test("Decision Maker filters come from the URL, with an unknown email filter as any", () => {
+  expect(parseDecisionMakerFilters({ q: " ada ", email: "cooldown" })).toEqual({ q: "ada", email: "cooldown" });
+  expect(parseDecisionMakerFilters({ email: "nope" })).toEqual({ q: "", email: "any" });
+});
+
+test("Decision Makers match the search in their name, headline, Company or email, ignoring case", () => {
+  const people = [
+    person("Ada Lovelace"),
+    person("Grace Hopper", { headline: "Head of Talent" }),
+    person("Linus", { companyName: "Initech" }),
+    person("Margaret", { email: "margaret@hamilton.dev" }),
+  ];
+  const now = new Date("2026-11-08T00:00:00Z");
+  const names = (q: string) => filterDecisionMakers(people, { q, email: "any" }, now).map(({ name }) => name);
+  expect(names("ada")).toEqual(["Ada Lovelace"]);
+  expect(names("TALENT")).toEqual(["Grace Hopper"]);
+  expect(names("initech")).toEqual(["Linus"]);
+  expect(names("hamilton")).toEqual(["Margaret"]);
+  expect(names("")).toHaveLength(4);
+});
+
+test("Decision Makers filter by whether they have an email, or are in Cooldown", () => {
+  const now = new Date("2026-11-08T00:00:00Z");
+  const people = [
+    person("No email"),
+    person("Emailed long ago", { email: "a@x.dev", lastEmailedAt: new Date("2026-09-01T00:00:00Z") }),
+    person("Emailed last week", { email: "b@x.dev", lastEmailedAt: new Date("2026-11-01T00:00:00Z") }),
+  ];
+  const names = (email: DecisionMakerEmailFilter) => filterDecisionMakers(people, { q: "", email }, now).map(({ name }) => name);
+  expect(names("with")).toEqual(["Emailed long ago", "Emailed last week"]);
+  expect(names("without")).toEqual(["No email"]);
+  expect(names("cooldown")).toEqual(["Emailed last week"]);
+});
+
+test("Companies match the search in their name, ignoring case", () => {
+  const companies = [{ name: "Acme Corp" }, { name: "Initech" }];
+  expect(filterCompanies(companies, parseCompanyFilters({ q: " acme " }))).toEqual([{ name: "Acme Corp" }]);
+  expect(filterCompanies(companies, parseCompanyFilters({}))).toEqual(companies);
 });

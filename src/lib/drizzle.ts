@@ -795,6 +795,89 @@ export async function listStatsRows(databaseUrl: string) {
   return { jobs: jobRows, sentAt: sent.map(({ sentAt }) => sentAt!) };
 }
 
+/** Every Company, A to Z, with how many Jobs, Applications and Decision Makers (and of them with an email) it has. */
+export async function listCompaniesWithCounts(databaseUrl: string) {
+  return client(databaseUrl)
+    .select({
+      id: companies.id,
+      name: companies.name,
+      linkedinUrl: companies.linkedinUrl,
+      jobs: sql<number>`(select count(*) from ${jobs} where ${jobs.companyLinkedinUrl} = ${companies.linkedinUrl}
+        or ${jobs.id} in (select ${applications.jobId} from ${applications} where ${applications.companyId} = ${companies.id}))::int`,
+      applications: sql<number>`(select count(*) from ${applications} where ${applications.companyId} = ${companies.id})::int`,
+      decisionMakers: sql<number>`(select count(*) from ${decisionMakers} where ${decisionMakers.companyId} = ${companies.id})::int`,
+      withEmail: sql<number>`(select count(*) from ${decisionMakers}
+        where ${decisionMakers.companyId} = ${companies.id} and ${decisionMakers.email} is not null)::int`,
+    })
+    .from(companies)
+    .orderBy(asc(sql`lower(${companies.name})`));
+}
+
+/** The Company with its LinkedIn page's Jobs, and the Jobs of its Applications, newest first. Undefined when it doesn't exist. */
+export async function getCompanyWithJobs(databaseUrl: string, id: number) {
+  const db = client(databaseUrl);
+  const [company] = await db.select().from(companies).where(eq(companies.id, id));
+  if (!company) return undefined;
+  const companyJobs = await db
+    .select({ ...savedJobColumns(), applicationId: applications.id })
+    .from(jobs)
+    .leftJoin(applications, eq(applications.jobId, jobs.id))
+    .where(or(eq(jobs.companyLinkedinUrl, company.linkedinUrl), eq(applications.companyId, id)))
+    .orderBy(desc(jobs.id));
+  return { company, jobs: companyJobs };
+}
+
+/** Every Decision Maker with their Company's name, the most recently emailed first, then the most recently found. */
+export async function listDecisionMakersWithCompanies(databaseUrl: string) {
+  const db = client(databaseUrl);
+  const rows = await db
+    .select({ decisionMaker: decisionMakers, companyName: companies.name })
+    .from(decisionMakers)
+    .innerJoin(companies, eq(companies.id, decisionMakers.companyId))
+    .orderBy(sql`${decisionMakers.lastEmailedAt} desc nulls last`, desc(decisionMakers.foundAt), desc(decisionMakers.id));
+  const byDecisionMaker = new Map<number, { applicationId: number; sentAt: Date | null }[]>();
+  for (const { decisionMakerId, applicationId, sentAt } of await db.select().from(applicationRecipients)) {
+    byDecisionMaker.set(decisionMakerId, [...(byDecisionMaker.get(decisionMakerId) ?? []), { applicationId, sentAt }]);
+  }
+  return rows.map(({ decisionMaker, companyName }) => ({
+    ...decisionMaker,
+    companyName,
+    applications: byDecisionMaker.get(decisionMaker.id) ?? [],
+  }));
+}
+
+const ACTIVITY_SHOWN = 100;
+
+/**
+ * The newest Function runs, Step Logs and emails sent, up to 100 of each, for the dashboard's Activity. `since` is when
+ * the rows are complete from: a kind cut at 100 may have older rows left out, so the timeline stops at its oldest one.
+ */
+export async function listActivityRows(databaseUrl: string) {
+  const db = client(databaseUrl);
+  const runs = await db.select().from(functionRuns).orderBy(desc(functionRuns.id)).limit(ACTIVITY_SHOWN);
+  const logs = await db.select().from(stepLogs).orderBy(desc(stepLogs.id)).limit(ACTIVITY_SHOWN);
+  const sends = await db
+    .select({
+      applicationId: applicationRecipients.applicationId,
+      decisionMakerId: decisionMakers.id,
+      name: decisionMakers.name,
+      email: decisionMakers.email,
+      sentAt: applicationRecipients.sentAt,
+    })
+    .from(applicationRecipients)
+    .innerJoin(decisionMakers, eq(decisionMakers.id, applicationRecipients.decisionMakerId))
+    .where(isNotNull(applicationRecipients.sentAt))
+    .orderBy(desc(applicationRecipients.sentAt))
+    .limit(ACTIVITY_SHOWN);
+  const cutAt = [
+    runs.length === ACTIVITY_SHOWN ? runs.at(-1)!.startedAt : null,
+    logs.length === ACTIVITY_SHOWN ? logs.at(-1)!.startedAt : null,
+    sends.length === ACTIVITY_SHOWN ? sends.at(-1)!.sentAt! : null,
+  ].filter((at): at is Date => at !== null);
+  const since = cutAt.length ? new Date(Math.max(...cutAt.map((at) => at.getTime()))) : null;
+  return { runs, stepLogs: logs, sends: sends.map((send) => ({ ...send, sentAt: send.sentAt! })), since };
+}
+
 export async function findApplicationIdForJob(databaseUrl: string, jobId: number) {
   const [application] = await client(databaseUrl)
     .select({ id: applications.id })

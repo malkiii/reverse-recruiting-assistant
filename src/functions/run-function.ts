@@ -33,10 +33,10 @@ export async function runFunction(runId: number, functionName: string, work: () 
     try {
       await runs.finish(runId, { status: "failed", finishedAt: now(), error: message });
     } finally {
-      const link = new URL("/function-runs", dashboardUrl);
+      const link = new URL("/activity", dashboardUrl);
       // A Telegram outage only costs the alert, and must not replace the failure itself.
       await telegram
-        .sendHtml(failureAlert(functionName, runId, now(), message), { label: "🔎 View Function Runs", url: link.toString() })
+        .sendHtml(failureAlert(functionName, runId, now(), message), { label: "🔎 View Activity", url: link.toString() })
         .catch(console.error);
     }
   }

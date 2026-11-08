@@ -23,5 +23,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return backToGooglePage(error instanceof Error ? error.message : String(error));
   }
+  // On first entry, the Resume Folder is chosen next.
+  if (!(await dashboardGoogle().resumeFolder.get())) {
+    const response = NextResponse.redirect(new URL("/resumes", origin));
+    response.cookies.delete({ name: OAUTH_STATE_COOKIE, path: CALLBACK_PATH });
+    return response;
+  }
   return backToGooglePage();
 }

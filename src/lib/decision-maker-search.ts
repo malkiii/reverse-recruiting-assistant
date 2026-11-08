@@ -186,7 +186,7 @@ function isCurrent(foundAt: Date, now: Date) {
   return now < refreshAt;
 }
 
-export const inCooldown = ({ lastEmailedAt }: DecisionMaker, now: Date) =>
+export const inCooldown = ({ lastEmailedAt }: Pick<DecisionMaker, "lastEmailedAt">, now: Date) =>
   lastEmailedAt !== null && now.getTime() - lastEmailedAt.getTime() < COOLDOWN_MS;
 
 function daysAgo(date: Date, now: Date) {

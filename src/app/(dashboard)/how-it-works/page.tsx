@@ -54,7 +54,10 @@ export default function HowItWorksPage() {
             Add a provider with its API key, then pick one of the models it lets you use to choose a Resume and write the Cover Letter.
           </Step>
           <Step title="Connect Google" href="/google" linkText="Google">
-            Connect Gmail, used to send, and choose the Resume Folder holding your Resume PDFs.
+            Connect Gmail, used to send, and Drive, which holds your Resume PDFs.
+          </Step>
+          <Step title="Choose your Resume Folder" href="/resumes" linkText="Resumes">
+            Pick the Google Drive folder holding your Resume PDFs, and share it as &quot;Anyone with the link&quot;.
           </Step>
           <Step title="Set up Job Collection" href="/jobs" linkText="Jobs">
             Open the Collection settings side panel and add your Job Boards and Job Feeds. See{" "}
@@ -139,10 +142,7 @@ export default function HowItWorksPage() {
             Must be on for Send to work. While it&apos;s off, Send is refused.
           </Item>
           <Item name="Google" href="/google">
-            Connect Gmail, used to send, and choose the Resume Folder holding your Resume PDFs.
-          </Item>
-          <Item name="Function runs" href="/function-runs">
-            Recent background runs and their errors.
+            Connect Gmail, used to send, and Drive, which holds your Resume PDFs.
           </Item>
           <Item name="Old Data" href="/settings">
             Deletes data 6 months old or more.

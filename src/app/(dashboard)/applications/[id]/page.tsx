@@ -537,8 +537,8 @@ export default async function ApplicationPage({
       {(runs.length > 0 || removable) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {runs.length > 0 ? (
-            <Link href="/function-runs" className={`text-sm ${linkClass}`}>
-              Function runs
+            <Link href="/activity" className={`text-sm ${linkClass}`}>
+              Activity
             </Link>
           ) : (
             <span />

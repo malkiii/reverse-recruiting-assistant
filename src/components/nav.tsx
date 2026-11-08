@@ -44,9 +44,44 @@ const TABS = [
     ),
   },
   {
+    href: "/companies",
+    label: "Companies",
+    icon: icon(
+      <>
+        <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 10h5a1 1 0 0 1 1 1v10M2 21h20" />
+        <path d="M8 8h2M8 12h2M8 16h2M17 14h0M17 17h0" />
+      </>,
+    ),
+  },
+  {
+    href: "/decision-makers",
+    label: "Decision Makers",
+    icon: icon(
+      <>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20" />
+      </>,
+    ),
+  },
+  {
+    href: "/resumes",
+    label: "Resumes",
+    icon: icon(
+      <>
+        <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" />
+        <path d="M14 3v5h5M9 13h6M9 17h6" />
+      </>,
+    ),
+  },
+  {
     href: "/stats",
     label: "Stats",
     icon: icon(<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />),
+  },
+  {
+    href: "/activity",
+    label: "Activity",
+    icon: icon(<path d="M3 12h4l3-8 4 16 3-8h4" />),
   },
   {
     href: "/settings",
@@ -62,8 +97,8 @@ const TABS = [
   },
 ];
 
-/** Google and Function runs live under Settings. */
-const SECTION_OF: Record<string, string> = { "/google": "/settings", "/function-runs": "/settings" };
+/** Google lives under Settings, and Function runs moved to Activity. */
+const SECTION_OF: Record<string, string> = { "/google": "/settings", "/function-runs": "/activity" };
 
 function activeTab(pathname: string) {
   const section = `/${pathname.split("/")[1]}`;
@@ -71,6 +106,25 @@ function activeTab(pathname: string) {
 }
 
 const HOW_IT_WORKS = "/how-it-works";
+
+/** The tabs the phone's bottom bar shows; the rest are under More. */
+const PHONE_TABS = ["/jobs", "/applications", "/stats"];
+const MORE = "more";
+
+const HOW_IT_WORKS_ICON = icon(
+  <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h0" />
+  </>,
+);
+
+const MORE_ICON = icon(
+  <>
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+  </>,
+);
 
 const NO_STORAGE: FilterStorage = { getItem: () => null, setItem: () => {} };
 
@@ -102,8 +156,21 @@ export function Nav({ dark }: { dark: boolean }) {
   const pathname = usePathname();
   const active = activeTab(pathname);
   const hrefOf = useTabHrefs(pathname);
-  // Phones reach How it works from Settings.
-  const activeOnPhone = active === HOW_IT_WORKS ? "/settings" : active;
+  const activeOnPhone = PHONE_TABS.includes(active) ? active : MORE;
+  const [moreOpen, setMoreOpen] = useState(false);
+  const phoneTabs = TABS.filter((tab) => PHONE_TABS.includes(tab.href));
+  const moreTabs = [
+    ...TABS.filter((tab) => !PHONE_TABS.includes(tab.href)),
+    { href: HOW_IT_WORKS, label: "How it works", icon: HOW_IT_WORKS_ICON },
+  ];
+
+  // More closes when a tab is chosen, and on Escape.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (event: KeyboardEvent) => event.key === "Escape" && setMoreOpen(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [moreOpen]);
 
   return (
     <>
@@ -140,12 +207,7 @@ export function Nav({ dark }: { dark: boolean }) {
             active === HOW_IT_WORKS ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"
           }`}
         >
-          {icon(
-            <>
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h0" />
-            </>,
-          )}
+          {HOW_IT_WORKS_ICON}
           How it works
         </Link>
         <div className="flex items-center justify-between border-t border-line px-2 pt-3 text-xs text-faint">
@@ -154,12 +216,46 @@ export function Nav({ dark }: { dark: boolean }) {
         </div>
       </aside>
 
+      {moreOpen && (
+        <div className="fixed inset-0 z-30 md:hidden">
+          <button
+            type="button"
+            aria-label="Close More"
+            onClick={() => setMoreOpen(false)}
+            className="absolute inset-0 bg-black/30"
+          />
+          <nav
+            id="more-tabs"
+            aria-label="More"
+            className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] rounded-t-lg border-t border-line bg-bg p-2"
+          >
+            <ul>
+              {moreTabs.map((tab) => (
+                <li key={tab.href}>
+                  <Link
+                    href={hrefOf(tab.href)}
+                    onClick={() => setMoreOpen(false)}
+                    aria-current={active === tab.href ? "page" : undefined}
+                    className={`flex min-h-12 items-center gap-3 rounded-sm px-3 text-[15px] font-medium transition ${
+                      active === tab.href ? "bg-subtle text-fg" : "text-fg-2 active:bg-subtle"
+                    }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      )}
+
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
         <ul className="grid h-16 grid-cols-4">
-          {TABS.map((tab) => (
+          {phoneTabs.map((tab) => (
             <li key={tab.href}>
               <Link
                 href={hrefOf(tab.href)}
@@ -173,6 +269,20 @@ export function Nav({ dark }: { dark: boolean }) {
               </Link>
             </li>
           ))}
+          <li>
+            <button
+              type="button"
+              aria-expanded={moreOpen}
+              aria-controls="more-tabs"
+              onClick={() => setMoreOpen((open) => !open)}
+              className={`flex h-full w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95 ${
+                activeOnPhone === MORE || moreOpen ? "text-fg" : "text-faint"
+              }`}
+            >
+              {MORE_ICON}
+              More
+            </button>
+          </li>
         </ul>
       </nav>
     </>

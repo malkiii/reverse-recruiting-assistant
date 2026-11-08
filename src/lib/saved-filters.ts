@@ -2,7 +2,7 @@
 
 export type FilterStorage = Pick<Storage, "getItem" | "setItem">;
 
-const FILTER_TABS = ["/jobs", "/applications", "/stats"];
+const FILTER_TABS = ["/jobs", "/applications", "/companies", "/decision-makers", "/stats", "/activity"];
 
 const keyOf = (tab: string) => `filters:${tab}`;
 

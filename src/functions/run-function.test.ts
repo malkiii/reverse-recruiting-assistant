@@ -41,7 +41,7 @@ test("a Function that throws alerts the Admin with its name and a dashboard link
   expect(deps.telegram.messages).toEqual([
     {
       text: "🚨 <b>Function failed</b>\n\n⚙️ noop  ·  run #1\n🕒 01 Nov, 12:00 UTC\n\n❌ <code>boom</code>",
-      link: { label: "🔎 View Function Runs", url: "https://dashboard.example.com/function-runs" },
+      link: { label: "🔎 View Activity", url: "https://dashboard.example.com/activity" },
       html: true,
     },
   ]);

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { resumesIn } from "./resumes";
+import { resumesIn, resumeUsage } from "./resumes";
 
 const pdf = (name: string) => ({ id: name, name, mimeType: "application/pdf", webViewLink: `https://drive/${name}` });
 
@@ -23,4 +23,17 @@ test("only PDFs whose names end in resume or CV, in any case, are Resumes", () =
     "Product Manager Cv.pdf",
     "JohnDoeResume.pdf",
   ]);
+});
+
+test("each Resume counts the Applications that use it, and how many of them were Sent", () => {
+  const usage = resumeUsage([
+    { resumeFileId: "backend", status: "sent" },
+    { resumeFileId: "backend", status: "in-review" },
+    { resumeFileId: "backend", status: "sent" },
+    { resumeFileId: "frontend", status: "failed" },
+    { resumeFileId: null, status: "preparing" },
+  ]);
+  expect(usage.get("backend")).toEqual({ applications: 3, sent: 2 });
+  expect(usage.get("frontend")).toEqual({ applications: 1, sent: 0 });
+  expect(usage.get("designer")).toBeUndefined();
 });

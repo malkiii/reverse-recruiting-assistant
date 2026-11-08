@@ -283,7 +283,7 @@ class Stop extends Error {
 /** The Resumes in the Resume Folder. Stops when there are none, before anything is paid for. */
 async function listResumes(deps: PrepareDeps) {
   const folder = await deps.resumeFolder.get();
-  if (!folder) throw new Stop("No Resume Folder is chosen: choose one on the dashboard's Google page");
+  if (!folder) throw new Stop("No Resume Folder is chosen: choose one on the dashboard's Resumes page");
   const resumes = resumesIn(await (await deps.drive()).listFiles(folder.id));
   if (resumes.length === 0) {
     throw new Stop('Your Resume Folder has no Resume: add a PDF whose name ends in "resume" or "CV"');
@@ -437,7 +437,7 @@ async function writeCoverLetter(deps: PrepareDeps, id: number, companyName: stri
 /** Stops before Review when the Resume Folder isn't shared by link, so a recipient never gets a dead Resume link. */
 async function checkSharing(deps: PrepareDeps) {
   const folder = await deps.resumeFolder.get();
-  if (!folder) throw new Stop("No Resume Folder is chosen: choose one on the dashboard's Google page");
+  if (!folder) throw new Stop("No Resume Folder is chosen: choose one on the dashboard's Resumes page");
   const drive = await deps.drive();
   if (!(await drive.isSharedByLink(folder.id))) {
     throw new Stop(`Your Resume Folder "${folder.name}" isn't shared as "Anyone with the link": share it, then Retry`);
