@@ -44,16 +44,6 @@ const TABS = [
     ),
   },
   {
-    href: "/companies",
-    label: "Companies",
-    icon: icon(
-      <>
-        <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 10h5a1 1 0 0 1 1 1v10M2 21h20" />
-        <path d="M8 8h2M8 12h2M8 16h2M17 14h0M17 17h0" />
-      </>,
-    ),
-  },
-  {
     href: "/decision-makers",
     label: "Decision Makers",
     icon: icon(

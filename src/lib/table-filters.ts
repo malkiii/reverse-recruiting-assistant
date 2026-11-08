@@ -108,11 +108,3 @@ export const filterDecisionMakers = <T extends FilterableDecisionMaker>(rows: T[
         (email === "without" && row.email === null) ||
         (email === "cooldown" && inCooldown(row, now))),
   );
-
-export type CompanyFilters = { q: string };
-
-export const parseCompanyFilters = (params: SearchParams): CompanyFilters => ({ q: one(params.q) });
-
-/** Companies whose name has the search. */
-export const filterCompanies = <T extends { name: string }>(rows: T[], { q }: CompanyFilters) =>
-  rows.filter((row) => !q || contains(row.name, q));

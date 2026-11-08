@@ -2,9 +2,7 @@ import { expect, test } from "vitest";
 import {
   type DecisionMakerEmailFilter,
   filterApplications,
-  filterCompanies,
   filterDecisionMakers,
-  parseCompanyFilters,
   parseDecisionMakerFilters,
   hasJobFilters,
   paginate,
@@ -105,8 +103,3 @@ test("Decision Makers filter by whether they have an email, or are in Cooldown",
   expect(names("cooldown")).toEqual(["Emailed last week"]);
 });
 
-test("Companies match the search in their name, ignoring case", () => {
-  const companies = [{ name: "Acme Corp" }, { name: "Initech" }];
-  expect(filterCompanies(companies, parseCompanyFilters({ q: " acme " }))).toEqual([{ name: "Acme Corp" }]);
-  expect(filterCompanies(companies, parseCompanyFilters({}))).toEqual(companies);
-});

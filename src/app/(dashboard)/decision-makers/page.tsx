@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
+import { CopyButton } from "@/components/copy-button";
 import { FilterInput, FilterSegmented } from "@/components/table-filters";
 import { TableResults, TableTransition } from "@/components/table-transition";
-import { Card, cx, EmptyState, ExternalLink, linkClass, PageHeader, Pagination, shortDate, Tag } from "@/components/ui";
-import { loadApplications } from "@/lib/dashboard-data";
+import { Card, EmptyState, ExternalLink, linkClass, PageHeader, Pagination, shortDate, Tag } from "@/components/ui";
 import { inCooldown } from "@/lib/decision-maker-search";
 import { listDecisionMakersWithCompanies } from "@/lib/drizzle";
 import { parseDashboardEnv } from "@/lib/env";
@@ -40,11 +40,7 @@ export default async function DecisionMakersPage({ searchParams }: { searchParam
   const filters = parseDecisionMakerFilters(params);
   const { DATABASE_URL, TIMEZONE } = parseDashboardEnv(process.env);
   const now = new Date();
-  const [all, applications] = await Promise.all([
-    listDecisionMakersWithCompanies(DATABASE_URL),
-    loadApplications(DATABASE_URL, now),
-  ]);
-  const jobTitles = new Map(applications.map(({ application, jobTitle }) => [application.id, jobTitle]));
+  const all = await listDecisionMakersWithCompanies(DATABASE_URL);
   const { rows, page, pages } = paginate(filterDecisionMakers(all, filters, now), parsePage(params.page));
   const filtered = Boolean(filters.q || filters.email !== "any");
 
@@ -92,36 +88,21 @@ export default async function DecisionMakersPage({ searchParams }: { searchParam
                         {inCooldown(person, now) && <Tag tone="amber">In Cooldown</Tag>}
                       </div>
                       <p className="truncate text-sm text-muted">{person.headline}</p>
-                      <p className="truncate text-sm text-muted">
-                        <Link href={`/companies/${person.companyId}`} className="hover:text-fg hover:underline">
-                          {person.companyName}
-                        </Link>
-                        {" · "}
-                        {person.email ?? "No email"}
-                        {(() => {
-                          const emails = person.applications.filter(({ sentAt }) => sentAt).length;
-                          return emails > 0 && <> · {emails} email{emails === 1 ? "" : "s"}</>;
-                        })()}
-                        {person.lastEmailedAt && <> · last {shortDate(person.lastEmailedAt, TIMEZONE)}</>}
+                      <p className="flex items-center text-sm text-muted">
+                        <span className="truncate">
+                          <ExternalLink href={person.companyLinkedinUrl} className="hover:text-fg hover:underline">
+                            {person.companyName}
+                          </ExternalLink>
+                          {" · "}
+                          {person.email ?? "No email"}
+                          {(() => {
+                            const emails = person.applications.filter(({ sentAt }) => sentAt).length;
+                            return emails > 0 && <> · {emails} email{emails === 1 ? "" : "s"}</>;
+                          })()}
+                          {person.lastEmailedAt && <> · last {shortDate(person.lastEmailedAt, TIMEZONE)}</>}
+                        </span>
+                        {person.email && <CopyButton text={person.email} label={`Copy ${person.name}'s email`} />}
                       </p>
-                      {person.applications.length > 0 && (
-                        <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                          {person.applications.map(({ applicationId, sentAt }) => (
-                            <li key={applicationId}>
-                              <Link
-                                href={`/applications/${applicationId}`}
-                                className={cx(
-                                  "inline-flex items-center rounded-xs px-1.5 py-0.5 text-xs font-medium transition hover:ring-1 hover:ring-line-strong",
-                                  sentAt ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-subtle text-fg-2",
-                                )}
-                              >
-                                {jobTitles.get(applicationId) ?? `Application ${applicationId}`}
-                                {sentAt && " · Sent"}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
                     </div>
                   </li>
                 ))}

@@ -52,12 +52,10 @@ test("tabs still work when the browser blocks storage", () => {
   expect(tabHref(blocked, "/jobs")).toBe("/jobs");
 });
 
-test("the Companies, Decision Makers and Activity tabs bring back their filters too", () => {
+test("the Decision Makers and Activity tabs bring back their filters too", () => {
   const storage = memoryStorage();
-  saveFilters(storage, "/companies", new URLSearchParams("q=acme&page=2"), null);
   saveFilters(storage, "/decision-makers", new URLSearchParams("email=with"), null);
   saveFilters(storage, "/activity", new URLSearchParams("kind=email"), null);
-  expect(tabHref(storage, "/companies")).toBe("/companies?q=acme");
   expect(tabHref(storage, "/decision-makers")).toBe("/decision-makers?email=with");
   expect(tabHref(storage, "/activity")).toBe("/activity?kind=email");
 });

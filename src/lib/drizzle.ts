@@ -795,43 +795,11 @@ export async function listStatsRows(databaseUrl: string) {
   return { jobs: jobRows, sentAt: sent.map(({ sentAt }) => sentAt!) };
 }
 
-/** Every Company, A to Z, with how many Jobs, Applications and Decision Makers (and of them with an email) it has. */
-export async function listCompaniesWithCounts(databaseUrl: string) {
-  return client(databaseUrl)
-    .select({
-      id: companies.id,
-      name: companies.name,
-      linkedinUrl: companies.linkedinUrl,
-      jobs: sql<number>`(select count(*) from ${jobs} where ${jobs.companyLinkedinUrl} = ${companies.linkedinUrl}
-        or ${jobs.id} in (select ${applications.jobId} from ${applications} where ${applications.companyId} = ${companies.id}))::int`,
-      applications: sql<number>`(select count(*) from ${applications} where ${applications.companyId} = ${companies.id})::int`,
-      decisionMakers: sql<number>`(select count(*) from ${decisionMakers} where ${decisionMakers.companyId} = ${companies.id})::int`,
-      withEmail: sql<number>`(select count(*) from ${decisionMakers}
-        where ${decisionMakers.companyId} = ${companies.id} and ${decisionMakers.email} is not null)::int`,
-    })
-    .from(companies)
-    .orderBy(asc(sql`lower(${companies.name})`));
-}
-
-/** The Company with its LinkedIn page's Jobs, and the Jobs of its Applications, newest first. Undefined when it doesn't exist. */
-export async function getCompanyWithJobs(databaseUrl: string, id: number) {
-  const db = client(databaseUrl);
-  const [company] = await db.select().from(companies).where(eq(companies.id, id));
-  if (!company) return undefined;
-  const companyJobs = await db
-    .select({ ...savedJobColumns(), applicationId: applications.id })
-    .from(jobs)
-    .leftJoin(applications, eq(applications.jobId, jobs.id))
-    .where(or(eq(jobs.companyLinkedinUrl, company.linkedinUrl), eq(applications.companyId, id)))
-    .orderBy(desc(jobs.id));
-  return { company, jobs: companyJobs };
-}
-
-/** Every Decision Maker with their Company's name, the most recently emailed first, then the most recently found. */
+/** Every Decision Maker with their Company's name and LinkedIn page, the most recently emailed first, then the most recently found. */
 export async function listDecisionMakersWithCompanies(databaseUrl: string) {
   const db = client(databaseUrl);
   const rows = await db
-    .select({ decisionMaker: decisionMakers, companyName: companies.name })
+    .select({ decisionMaker: decisionMakers, companyName: companies.name, companyLinkedinUrl: companies.linkedinUrl })
     .from(decisionMakers)
     .innerJoin(companies, eq(companies.id, decisionMakers.companyId))
     .orderBy(sql`${decisionMakers.lastEmailedAt} desc nulls last`, desc(decisionMakers.foundAt), desc(decisionMakers.id));
@@ -839,9 +807,10 @@ export async function listDecisionMakersWithCompanies(databaseUrl: string) {
   for (const { decisionMakerId, applicationId, sentAt } of await db.select().from(applicationRecipients)) {
     byDecisionMaker.set(decisionMakerId, [...(byDecisionMaker.get(decisionMakerId) ?? []), { applicationId, sentAt }]);
   }
-  return rows.map(({ decisionMaker, companyName }) => ({
+  return rows.map(({ decisionMaker, companyName, companyLinkedinUrl }) => ({
     ...decisionMaker,
     companyName,
+    companyLinkedinUrl,
     applications: byDecisionMaker.get(decisionMaker.id) ?? [],
   }));
 }
