@@ -19,7 +19,6 @@ export type JobFilters = {
   sources: string[];
   location: string;
   application: ApplicationFilter;
-  company: string;
 };
 
 export function parseJobFilters(params: SearchParams): JobFilters {
@@ -28,12 +27,11 @@ export function parseJobFilters(params: SearchParams): JobFilters {
     sources: [...new Set(many(params.source))],
     location: one(params.location),
     application: APPLICATION_FILTERS.find((filter) => filter === one(params.application)) ?? "any",
-    company: one(params.company),
   };
 }
 
 export const hasJobFilters = (filters: JobFilters) =>
-  Boolean(filters.q || filters.sources.length || filters.location || filters.application !== "any" || filters.company);
+  Boolean(filters.q || filters.sources.length || filters.location || filters.application !== "any");
 
 /** The page in the URL, 1 when it's missing or not a positive whole number. */
 export function parsePage(value: string | string[] | undefined) {

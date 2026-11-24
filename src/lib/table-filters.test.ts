@@ -18,14 +18,13 @@ test("Job filters come from the URL, with unknown values dropped", () => {
     sources: ["LinkedIn"],
     location: "",
     application: "any",
-    company: "",
   });
   expect(parseJobFilters({ source: "Glassdoor", application: "none" })).toMatchObject({
     sources: ["Glassdoor"],
     application: "none",
   });
   expect(hasJobFilters(parseJobFilters({}))).toBe(false);
-  expect(hasJobFilters(parseJobFilters({ company: "Acme" }))).toBe(true);
+  expect(hasJobFilters(parseJobFilters({ location: "Berlin" }))).toBe(true);
 });
 
 test("A missing or bad page is page 1", () => {

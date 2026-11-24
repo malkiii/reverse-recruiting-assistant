@@ -726,7 +726,6 @@ function jobConditions(filters: JobFilters) {
     filters.q ? or(ilike(jobs.title, containing(filters.q)), ilike(jobs.companyName, containing(filters.q))) : undefined,
     filters.sources.length ? inArray(jobs.source, filters.sources) : undefined,
     filters.location ? ilike(jobs.location, containing(filters.location)) : undefined,
-    filters.company ? eq(jobs.companyName, filters.company) : undefined,
     filters.application === "none" ? isNull(applications.id) : undefined,
     filters.application === "prepared" ? isNotNull(applications.id) : undefined,
   );
@@ -756,15 +755,11 @@ export async function listJobsWithApplications(databaseUrl: string, filters: Job
   return { rows, total, page: shown, pages: pageCount(total) };
 }
 
-/** The sources and Company names the Jobs filters offer, A to Z. */
+/** The sources the Jobs filters offer, A to Z. */
 export async function listJobFilterOptions(databaseUrl: string) {
   const db = client(databaseUrl);
   const sources = await db.selectDistinct({ source: jobs.source }).from(jobs).orderBy(asc(jobs.source));
-  const companies = await db
-    .selectDistinct({ companyName: jobs.companyName })
-    .from(jobs)
-    .orderBy(asc(jobs.companyName));
-  return { sources: sources.map(({ source }) => source), companies: companies.map(({ companyName }) => companyName) };
+  return { sources: sources.map(({ source }) => source) };
 }
 
 /** Every Application, newest first, with its Job's title and Company name and its newest Function run. */

@@ -54,40 +54,6 @@ export function FilterInput({ name, label, placeholder }: { name: string; label:
   );
 }
 
-/** A dropdown filter. The empty option removes the param. */
-export function FilterSelect({
-  name,
-  label,
-  emptyLabel,
-  options,
-}: {
-  name: string;
-  label: string;
-  emptyLabel: string;
-  options: string[];
-}) {
-  const value = useTableNavigation().params.get(name) ?? "";
-  const setParam = useSetParam(name);
-  // A value no longer offered, such as a cleaned-up Company, still shows as chosen.
-  const shown = value && !options.includes(value) ? [value, ...options] : options;
-
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(event) => setParam(event.target.value)}
-      className={cx(inputClass, "sm:w-56")}
-    >
-      <option value="">{emptyLabel}</option>
-      {shown.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 /**
  * A row of filter options for one param. The option with an empty value removes the param.
  * With `multiple`, the other options toggle in and out of the param instead of replacing it.

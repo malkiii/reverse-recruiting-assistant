@@ -6,7 +6,7 @@ import { connection } from "next/server";
 import { SidePanel, SidePanelToggle } from "@/components/side-panel";
 import { SubmitButton } from "@/components/submit-button";
 import { sourceName } from "@/components/status";
-import { FilterInput, FilterSegmented, FilterSelect } from "@/components/table-filters";
+import { FilterInput, FilterSegmented } from "@/components/table-filters";
 import { TableResults, TableTransition } from "@/components/table-transition";
 import {
   Alert,
@@ -121,17 +121,15 @@ const jobsHref = (filters: JobFilters, page?: number) =>
     source: filters.sources,
     location: filters.location,
     application: filters.application === "any" ? undefined : filters.application,
-    company: filters.company,
     page: page && page > 1 ? String(page) : undefined,
   });
 
-function JobFilterBar({ filters, sources, companies }: { filters: JobFilters; sources: string[]; companies: string[] }) {
+function JobFilterBar({ filters, sources }: { filters: JobFilters; sources: string[] }) {
   return (
     <div className="mb-4 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <FilterInput name="q" label="Search Jobs" placeholder="Search title or Company" />
         <FilterInput name="location" label="Location" placeholder="Location" />
-        <FilterSelect name="company" label="Company" emptyLabel="All Companies" options={companies} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {sources.length > 1 && (
@@ -215,7 +213,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
       <TableTransition>
         {(filtered || jobs.length > 0) && (
-          <JobFilterBar filters={filters} sources={options.sources} companies={options.companies} />
+          <JobFilterBar filters={filters} sources={options.sources} />
         )}
 
         <TableResults>
