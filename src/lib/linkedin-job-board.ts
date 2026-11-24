@@ -18,6 +18,8 @@ const itemSchema = z.object({
   job_description: z.string().nullish(),
   company_url: z.string().nullish(),
   company_logo_url: z.string().nullish(),
+  // Only given with include_job_details, and only when the employer publishes it.
+  salary_range: z.string().nullish(),
 });
 
 export const linkedInJobBoard: JobBoardGateway = {
@@ -32,6 +34,7 @@ export const linkedInJobBoard: JobBoardGateway = {
         location,
         posted_within: PAST_24_HOURS,
         jobs_entries: Math.max(limit, MIN_JOBS_PER_RUN),
+        include_job_details: true,
       },
       token,
     );
@@ -43,7 +46,7 @@ export const linkedInJobBoard: JobBoardGateway = {
     return actorRunItems(
       run,
       itemSchema,
-      ({ job_url, job_title, company_name, location, posted_date, job_description, company_url, company_logo_url }) => ({
+      ({ job_url, job_title, company_name, location, posted_date, job_description, company_url, company_logo_url, salary_range }) => ({
         source: SOURCE,
         title: job_title,
         companyName: company_name,
@@ -53,6 +56,7 @@ export const linkedInJobBoard: JobBoardGateway = {
         description: job_description ?? null,
         companyLinkedinUrl: company_url ?? null,
         companyLogoUrl: company_logo_url || null,
+        salary: salary_range || null,
       }),
     );
   },

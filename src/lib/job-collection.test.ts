@@ -35,7 +35,7 @@ const job = {
 const search = { keywords: "engineer", location: "Remote" };
 
 function setup({
-  jobs = [job],
+  jobs = [job] as CollectedJob[],
   enabled = true,
   searches = [search],
   remoteOnly = false,
@@ -494,6 +494,34 @@ test("each new Job is sent as its own Job Alert, with the Company logo and a but
       html: true,
       photo: image("acme"),
     },
+  ]);
+});
+
+test("a Job Alert shows the salary after the location, without saving it", async () => {
+  const { deps } = setup({ jobs: [{ ...job, salary: "$120,000 – $160,000 / year" }] });
+
+  await runCollection(deps);
+
+  expect(deps.telegram.messages.map(({ text }) => text)).toEqual([
+    "💼 <b>Software Engineer</b>\n\n🏢 Acme\n\n📍 Remote\n\n💰 $120,000 – $160,000 / year\n\n<i>(LinkedIn)</i>",
+  ]);
+  expect(await deps.jobs.list()).toEqual([job]);
+});
+
+test("a Job Alert left from an earlier Job Collection goes out without the salary", async () => {
+  const { deps } = setup({ jobs: [{ ...job, salary: "$120,000 / year" }] });
+  const send = deps.telegram.sendHtml.bind(deps.telegram);
+  deps.telegram.sendHtml = async () => {
+    throw new Error("Telegram is down");
+  };
+  await expect(runCollection(deps)).rejects.toThrow(/Telegram is down/);
+  deps.telegram.sendHtml = send;
+  deps.jobBoards = [];
+
+  await runCollection(deps);
+
+  expect(deps.telegram.messages.map(({ text }) => text)).toEqual([
+    "💼 <b>Software Engineer</b>\n\n🏢 Acme\n\n📍 Remote\n\n<i>(LinkedIn)</i>",
   ]);
 });
 

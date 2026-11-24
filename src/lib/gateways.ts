@@ -113,7 +113,12 @@ export type AlertState = (typeof jobs.$inferSelect)["alertState"];
 export type SavedJob = Job & { id: number };
 export type PendingAlertJob = SavedJob;
 /** A Job as a source returns it. Job Collection works out its post day. */
-export type CollectedJob = Omit<Job, "postDay"> & { postDay?: string | null; ageInDays?: number | null };
+export type CollectedJob = Omit<Job, "postDay"> & {
+  postDay?: string | null;
+  ageInDays?: number | null;
+  /** Shown in the Job Alert only, never saved. */
+  salary?: string | null;
+};
 export type JobBoardSettings = typeof jobBoardSettings.$inferSelect;
 export type ActorRun = Pick<typeof actorRuns.$inferSelect, "runId" | "actor" | "token" | "search" | "startedAt">;
 /** An actor run of an Application's Decision Maker search, found again by its purpose on a Retry. */

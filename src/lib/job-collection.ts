@@ -49,8 +49,12 @@ const utcDay = (date: Date) => date.toISOString().slice(0, 10);
 
 const DAY_MS = 24 * 60 * 60_000;
 
-/** A Job with no post date counts as posted on the day it was seen. */
-function withPostDay({ postDay, ageInDays, ...job }: CollectedJob, seenAt: Date): Job {
+/** Salaries by Job URL, kept for this Job Collection's Job Alerts only, since they aren't saved. */
+type Salaries = Map<string, string>;
+
+/** A Job with no post date counts as posted on the day it was seen. Its salary is noted in salaries, not kept. */
+function toJob({ postDay, ageInDays, salary, ...job }: CollectedJob, seenAt: Date, salaries: Salaries): Job {
+  if (salary?.trim()) salaries.set(job.url, salary.trim());
   if (postDay) return { ...job, postDay };
   if (ageInDays != null) return { ...job, postDay: utcDay(new Date(seenAt.getTime() - ageInDays * DAY_MS)) };
   return { ...job, postDay: utcDay(seenAt) };
@@ -139,7 +143,7 @@ async function startActorRuns(deps: CollectionDeps, unfinished: ActorRun[], erro
 }
 
 /** Each Job Feed is read once, so they are read while the actor runs are still going. */
-async function readJobFeeds(deps: CollectionDeps, isExcluded: TitleFilter, errors: string[]) {
+async function readJobFeeds(deps: CollectionDeps, isExcluded: TitleFilter, errors: string[], salaries: Salaries) {
   const feeds = (await deps.jobFeeds.list()).filter(({ enabled }) => enabled);
   console.log(`Reading ${feeds.length} enabled Job Feed(s)`);
 
@@ -147,7 +151,7 @@ async function readJobFeeds(deps: CollectionDeps, isExcluded: TitleFilter, error
     try {
       const seenAt = deps.now();
       const read = withoutExcluded(await deps.feedReader.read(feed.url), isExcluded, `Job Feed ${feed.url}`);
-      const jobs = read.map((job) => withPostDay(job, seenAt));
+      const jobs = read.map((job) => toJob(job, seenAt, salaries));
       const saved = await deps.jobs.save(jobs);
       console.log(`Job Feed ${feed.url}: read ${jobs.length} Job(s), ${saved} new`);
     } catch (error) {
@@ -163,7 +167,8 @@ export async function runCollection(deps: CollectionDeps) {
   console.log(`Job Collection started, ${unfinished.length} unfinished actor run(s) from earlier`);
   const isExcluded = excludedTitleMatcher(await deps.excludedKeywords.list());
   const runs = [...unfinished, ...(await startActorRuns(deps, unfinished, errors))];
-  await readJobFeeds(deps, isExcluded, errors);
+  const salaries: Salaries = new Map();
+  await readJobFeeds(deps, isExcluded, errors, salaries);
 
   // Counted per Job Board and day: a run left from an earlier day has its own 20.
   const savedPerBoardDay = new Map<string, number>();
@@ -197,7 +202,7 @@ export async function runCollection(deps: CollectionDeps) {
         // "Today" is the day the run started, so a run saved after midnight keeps its Jobs.
         // Skipped before the cap, so an excluded Job doesn't take the place of a wanted one.
         const collected = withoutExcluded(await jobBoard.results(run), isExcluded, `Actor run ${run.runId}`).map(
-          (job) => withPostDay(job, run.startedAt),
+          (job) => toJob(job, run.startedAt, salaries),
         );
         const postedToday = collected.filter(({ postDay }) => postDay === utcDay(run.startedAt));
         const boardDay = `${run.actor} ${utcDay(run.startedAt)}`;
@@ -216,7 +221,7 @@ export async function runCollection(deps: CollectionDeps) {
     }
   }
 
-  await sendJobAlerts(deps, errors);
+  await sendJobAlerts(deps, errors, salaries);
 
   console.log(`Job Collection finished with ${errors.length} error(s)`);
   if (errors.length > 0) throw new Error(errors.join("; "));
@@ -229,11 +234,12 @@ const APIFY_TOKENS_USED_UP_ALERT = [
 
 const APIFY_TOP_UP_LINK = { label: "💳 Top up on Apify", url: "https://console.apify.com/billing" };
 
-const jobAlertCaption = ({ title, companyName, location, source }: PendingAlertJob) =>
+const jobAlertCaption = ({ title, companyName, location, source }: PendingAlertJob, salary?: string) =>
   [
     `💼 <b>${escapeHtml(title)}</b>`,
     `🏢 ${escapeHtml(companyName)}`,
     ...(location ? [`📍 ${escapeHtml(location)}`] : []),
+    ...(salary ? [`💰 ${escapeHtml(salary)}`] : []),
     `<i>(${escapeHtml(source)})</i>`,
   ].join("\n\n");
 
@@ -261,8 +267,8 @@ function alertPhotos({ images }: CollectionDeps, job: PendingAlertJob): (() => P
   ];
 }
 
-async function sendJobAlert(deps: CollectionDeps, job: PendingAlertJob) {
-  const caption = jobAlertCaption(job);
+async function sendJobAlert(deps: CollectionDeps, job: PendingAlertJob, salary?: string) {
+  const caption = jobAlertCaption(job, salary);
   const link = { label: "📄 See Details", url: job.url };
 
   for (const photo of alertPhotos(deps, job)) {
@@ -278,13 +284,14 @@ async function sendJobAlert(deps: CollectionDeps, job: PendingAlertJob) {
   await deps.telegram.sendHtml(caption, link);
 }
 
-async function sendJobAlerts(deps: CollectionDeps, errors: string[]) {
+/** A Job Alert left from an earlier Job Collection goes out without its salary, which wasn't saved. */
+async function sendJobAlerts(deps: CollectionDeps, errors: string[], salaries: Salaries) {
   const pending = await deps.jobs.listPendingAlerts();
   let sent = 0;
 
   for (const job of pending) {
     try {
-      await sendJobAlert(deps, job);
+      await sendJobAlert(deps, job, salaries.get(job.url));
     } catch (error) {
       // Left pending, so the next Job Collection retries it.
       console.error(`Job Alert for ${job.url}: failed:`, error);

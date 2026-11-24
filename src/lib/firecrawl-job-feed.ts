@@ -12,7 +12,8 @@ const PROMPT =
   // Only a written date: a relative age such as "3 days ago" would make the model guess today's date.
   "Give postedDate as YYYY-MM-DD only when the page shows the full date the job was posted. " +
   "Leave it empty for relative ages such as '3 days ago' or when no date is shown. " +
-  "Give companyLogoUrl only when the page shows the company's logo image for the job.";
+  "Give companyLogoUrl only when the page shows the company's logo image for the job. " +
+  "Give salary as the pay written for the job, such as '$120,000 – $160,000 / year', only when the page shows it.";
 
 const JOBS_SCHEMA = {
   type: "object",
@@ -28,6 +29,7 @@ const JOBS_SCHEMA = {
           url: { type: "string" },
           postedDate: { type: "string" },
           companyLogoUrl: { type: "string" },
+          salary: { type: "string" },
         },
         required: ["title", "company", "url"],
       },
@@ -43,6 +45,7 @@ const itemSchema = z.object({
   url: z.string().min(1),
   postedDate: z.string().nullish(),
   companyLogoUrl: z.string().nullish(),
+  salary: z.string().nullish(),
 });
 
 const responseSchema = z.object({ data: z.object({ json: z.object({ jobs: z.array(z.unknown()) }) }) });
@@ -78,7 +81,7 @@ export function firecrawlJobFeedReader(apiKey: string): JobFeedReader {
           console.warn(`Skipped a malformed Job from Job Feed ${feedUrl}`);
           return [];
         }
-        const { title, company, location, url, postedDate, companyLogoUrl } = parsed.data;
+        const { title, company, location, url, postedDate, companyLogoUrl, salary } = parsed.data;
         return [
           {
             source,
@@ -90,6 +93,7 @@ export function firecrawlJobFeedReader(apiKey: string): JobFeedReader {
             description: null,
             companyLinkedinUrl: null,
             companyLogoUrl: companyLogoUrl && URL.canParse(companyLogoUrl, feedUrl) ? new URL(companyLogoUrl, feedUrl).href : null,
+            salary: salary || null,
           },
         ];
       });
