@@ -6,8 +6,10 @@ export type StatsRange = "24h" | "7d" | "30d" | "all";
 export type StatsRows = {
   jobs: { source: string; foundAt: Date }[];
   applications: { status: ApplicationStatus; currentStep: ApplicationStep; createdAt: Date }[];
-  /** When each Recipient's email went out. */
-  sentAt: Date[];
+  /** Each Recipient emailed, and when the email went out. */
+  sent: { applicationId: number; decisionMakerId: number; sentAt: Date }[];
+  /** At most one per Recipient. */
+  replies: { applicationId: number; decisionMakerId: number; receivedAt: Date }[];
 };
 
 export type Stats = {
@@ -18,6 +20,12 @@ export type Stats = {
   emailsSent: number;
   /** Null when no Application got past the Decision Maker search. */
   emailFoundRate: number | null;
+  /** Received in the range. */
+  replies: number;
+  /** Null when no email was sent in the range. */
+  replyRatePerDecisionMaker: number | null;
+  /** Null when no email was sent in the range. */
+  replyRatePerApplication: number | null;
 };
 
 const SEARCH_STEP = APPLICATION_STEPS.indexOf("find-decision-makers");
@@ -34,6 +42,25 @@ function emailFoundRate(applications: StatsApplication[]) {
   const searched = applications.filter(pastSearch);
   if (searched.length === 0) return null;
   return searched.filter(({ status }) => !NOBODY_TO_EMAIL.includes(status)).length / searched.length;
+}
+
+type Recipient = { applicationId: number; decisionMakerId: number };
+const recipientKey = ({ applicationId, decisionMakerId }: Recipient) => `${applicationId}-${decisionMakerId}`;
+
+/** Of the Recipients emailed, the share who replied. */
+function replyRatePerDecisionMaker(sent: Recipient[], replies: Recipient[]) {
+  if (sent.length === 0) return null;
+  const replied = new Set(replies.map(recipientKey));
+  return sent.filter((recipient) => replied.has(recipientKey(recipient))).length / sent.length;
+}
+
+/** Of the Applications emailed, the share with at least one reply. */
+function replyRatePerApplication(sent: Recipient[], replies: Recipient[]) {
+  const emailed = new Set(sent.map(({ applicationId }) => applicationId));
+  if (emailed.size === 0) return null;
+  const replied = new Set(replies.map(recipientKey));
+  const answered = new Set(sent.filter((recipient) => replied.has(recipientKey(recipient))).map(({ applicationId }) => applicationId));
+  return answered.size / emailed.size;
 }
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -56,13 +83,17 @@ const inRange = (range: StatsRange, now: Date) => (date: Date) => now.getTime() 
 export function stats(rows: StatsRows, range: StatsRange, now: Date): Stats {
   const within = inRange(range, now);
   const applications = rows.applications.filter(({ createdAt }) => within(createdAt));
+  const sent = rows.sent.filter(({ sentAt }) => within(sentAt));
   return {
     jobsPerSource: countBy(rows.jobs.filter(({ foundAt }) => within(foundAt)).map(({ source }) => source)).map(
       ([source, count]) => ({ source, count }),
     ),
     applicationsByStatus: countBy(applications.map(({ status }) => status)).map(([status, count]) => ({ status, count })),
-    emailsSent: rows.sentAt.filter(within).length,
+    emailsSent: sent.length,
     emailFoundRate: emailFoundRate(applications),
+    replies: rows.replies.filter(({ receivedAt }) => within(receivedAt)).length,
+    replyRatePerDecisionMaker: replyRatePerDecisionMaker(sent, rows.replies),
+    replyRatePerApplication: replyRatePerApplication(sent, rows.replies),
   };
 }
 
@@ -101,7 +132,7 @@ const daysBefore = (day: string, days: number) =>
  */
 export function activity(rows: StatsRows, range: StatsRange, now: Date, timeZone: string): ActivityPoint[] {
   const key = range === "24h" ? (date: Date) => hourIn(date, timeZone) : (date: Date) => dayIn(date, timeZone);
-  const dates = [...rows.jobs.map(({ foundAt }) => foundAt), ...rows.applications.map(({ createdAt }) => createdAt), ...rows.sentAt];
+  const dates = [...rows.jobs.map(({ foundAt }) => foundAt), ...rows.applications.map(({ createdAt }) => createdAt), ...rows.sent.map(({ sentAt }) => sentAt)];
 
   let buckets: string[];
   if (range === "24h") {
@@ -121,7 +152,7 @@ export function activity(rows: StatsRows, range: StatsRange, now: Date, timeZone
   };
   for (const { foundAt } of rows.jobs) add(foundAt, "jobs");
   for (const { createdAt } of rows.applications) add(createdAt, "applications");
-  for (const sentAt of rows.sentAt) add(sentAt, "emailsSent");
+  for (const { sentAt } of rows.sent) add(sentAt, "emailsSent");
   return [...points.values()];
 }
 

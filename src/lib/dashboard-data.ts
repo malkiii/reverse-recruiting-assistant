@@ -15,6 +15,6 @@ export type DashboardApplication = Awaited<ReturnType<typeof loadApplications>>[
 
 export async function loadStatsRows(databaseUrl: string, now: Date): Promise<StatsRows> {
   const applications = await loadApplications(databaseUrl, now);
-  const { jobs, sentAt } = await listStatsRows(databaseUrl);
-  return { jobs, sentAt, applications: applications.map(({ application }) => application) };
+  const { jobs, sent, replies } = await listStatsRows(databaseUrl);
+  return { jobs, sent, replies, applications: applications.map(({ application }) => application) };
 }

@@ -840,4 +840,10 @@ export class FakeReplyStore implements ReplyStore {
       .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime())
       .map((reply) => this.details(reply));
   }
+
+  async listForApplication(applicationId: number) {
+    return this.saved
+      .filter((reply) => reply.applicationId === applicationId)
+      .map(({ decisionMakerId, receivedAt }) => ({ decisionMakerId, receivedAt }));
+  }
 }

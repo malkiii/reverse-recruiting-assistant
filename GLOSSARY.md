@@ -128,6 +128,14 @@ _Avoid_: Response, answer
 The hourly check of the Gmail threads of emails sent in the last 30 days, which saves new Replies and alerts the Admin of each one.
 _Avoid_: Inbox sync, polling
 
+**Reply Rate per Decision Maker**:
+Of the Decision Makers emailed, the share who sent a Reply. Each Application a Decision Maker was emailed for counts once.
+_Avoid_: Response rate
+
+**Reply Rate per Application**:
+Of the sent Applications, the share with at least one Reply.
+_Avoid_: Response rate, success rate
+
 **People Refresh**:
 The search for a Company's Decision Makers again, required once its saved people are 6 months old.
 _Avoid_: Re-scrape

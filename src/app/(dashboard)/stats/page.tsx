@@ -49,6 +49,12 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
         <StatTile label="Email-Found Rate" value={percent(result.emailFoundRate)} />
       </div>
 
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+        <StatTile label="Replies" value={result.replies} href="/replies" />
+        <StatTile label="Reply rate per Decision Maker" value={percent(result.replyRatePerDecisionMaker)} />
+        <StatTile label="Reply rate per Application" value={percent(result.replyRatePerApplication)} />
+      </div>
+
       <Card className="mb-4">
         <CardHeader title={range === "24h" ? "Activity per hour" : "Activity per day"} />
         <CardBody>
@@ -84,6 +90,10 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
       <p className="mt-4 text-xs text-muted">
         Email-Found Rate: of the Applications that got past the search for Decision Makers, or ended in No Contacts or
         Direct Apply, the share that reached at least one Decision Maker with an email address.
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Reply rates count the emails sent in the range: per Decision Maker, the share of Decision Makers emailed who
+        replied; per Application, the share of sent Applications with at least one reply.
       </p>
     </>
   );
