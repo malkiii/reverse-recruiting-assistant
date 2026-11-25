@@ -364,6 +364,8 @@ export interface ReplyStore {
   markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date): Promise<void>;
   /** Every Reply, the most recently received first. At most one per recipient. */
   list(): Promise<Reply[]>;
+  /** When each Decision Maker of the Application replied. Only those who did. */
+  listForApplication(applicationId: number): Promise<{ decisionMakerId: number; receivedAt: Date }[]>;
 }
 
 export interface CompanyPageSearch {

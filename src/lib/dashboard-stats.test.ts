@@ -5,7 +5,92 @@ const now = new Date("2026-11-06T12:00:00Z");
 const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000);
 const daysAgo = (days: number) => hoursAgo(days * 24);
 
-const rows = (overrides: Partial<StatsRows>): StatsRows => ({ jobs: [], applications: [], sentAt: [], ...overrides });
+const rows = (overrides: Partial<StatsRows>): StatsRows => ({ jobs: [], applications: [], sent: [], replies: [], ...overrides });
+/** Emails sent at these times, each to a different Decision Maker of Application 1. */
+const emailsAt = (...dates: Date[]) => dates.map((sentAt, index) => ({ applicationId: 1, decisionMakerId: index + 1, sentAt }));
+
+test("Reply rate per Decision Maker is the share of Decision Makers emailed in the range who replied", () => {
+  const result = stats(
+    rows({
+      sent: [
+        { applicationId: 1, decisionMakerId: 1, sentAt: daysAgo(1) },
+        { applicationId: 1, decisionMakerId: 2, sentAt: daysAgo(2) },
+        { applicationId: 2, decisionMakerId: 3, sentAt: daysAgo(3) },
+        { applicationId: 3, decisionMakerId: 4, sentAt: daysAgo(4) },
+        // Emailed before the range.
+        { applicationId: 4, decisionMakerId: 5, sentAt: daysAgo(10) },
+      ],
+      replies: [
+        { applicationId: 1, decisionMakerId: 1, receivedAt: hoursAgo(1) },
+        { applicationId: 2, decisionMakerId: 3, receivedAt: daysAgo(2) },
+        { applicationId: 4, decisionMakerId: 5, receivedAt: daysAgo(6) },
+      ],
+    }),
+    "7d",
+    now,
+  );
+
+  expect(result.replyRatePerDecisionMaker).toBe(2 / 4);
+});
+
+test("Reply rate per Application is the share of Applications emailed in the range with at least one reply", () => {
+  const result = stats(
+    rows({
+      sent: [
+        // Two replies, counted once.
+        { applicationId: 1, decisionMakerId: 1, sentAt: daysAgo(1) },
+        { applicationId: 1, decisionMakerId: 2, sentAt: daysAgo(1) },
+        // One of two replied.
+        { applicationId: 2, decisionMakerId: 3, sentAt: daysAgo(2) },
+        { applicationId: 2, decisionMakerId: 4, sentAt: daysAgo(2) },
+        // No reply.
+        { applicationId: 3, decisionMakerId: 5, sentAt: daysAgo(3) },
+        // Sent before the range.
+        { applicationId: 4, decisionMakerId: 6, sentAt: daysAgo(10) },
+      ],
+      replies: [
+        { applicationId: 1, decisionMakerId: 1, receivedAt: hoursAgo(5) },
+        { applicationId: 1, decisionMakerId: 2, receivedAt: hoursAgo(4) },
+        { applicationId: 2, decisionMakerId: 4, receivedAt: hoursAgo(3) },
+        { applicationId: 4, decisionMakerId: 6, receivedAt: hoursAgo(2) },
+      ],
+    }),
+    "7d",
+    now,
+  );
+
+  expect(result.replyRatePerApplication).toBe(2 / 3);
+});
+
+test("Replies counts the replies received in the range", () => {
+  const result = stats(
+    rows({
+      replies: [
+        { applicationId: 1, decisionMakerId: 1, receivedAt: hoursAgo(2) },
+        { applicationId: 2, decisionMakerId: 2, receivedAt: hoursAgo(20) },
+        { applicationId: 3, decisionMakerId: 3, receivedAt: hoursAgo(30) },
+      ],
+    }),
+    "24h",
+    now,
+  );
+
+  expect(result.replies).toBe(2);
+});
+
+test("Reply rates are empty when no email was sent in the range", () => {
+  const result = stats(
+    rows({
+      sent: [{ applicationId: 1, decisionMakerId: 1, sentAt: daysAgo(8) }],
+      replies: [{ applicationId: 1, decisionMakerId: 1, receivedAt: daysAgo(1) }],
+    }),
+    "7d",
+    now,
+  );
+
+  expect(result.replyRatePerDecisionMaker).toBeNull();
+  expect(result.replyRatePerApplication).toBeNull();
+});
 
 test("Email-Found Rate counts only Applications that got past the Decision Maker search", () => {
   const result = stats(
@@ -70,7 +155,7 @@ test("Applications by status and emails sent count only what happened in the ran
         { status: "in-review", currentStep: "check-sharing", createdAt: daysAgo(1) },
         { status: "failed", currentStep: "read-job", createdAt: daysAgo(9) },
       ],
-      sentAt: [daysAgo(2), daysAgo(2), daysAgo(3), daysAgo(10)],
+      sent: emailsAt(daysAgo(2), daysAgo(2), daysAgo(3), daysAgo(10)),
     }),
     "7d",
     now,
@@ -84,7 +169,7 @@ test("Applications by status and emails sent count only what happened in the ran
 });
 
 test("All counts everything ever recorded", () => {
-  const result = stats(rows({ sentAt: [daysAgo(400), daysAgo(1)] }), "all", now);
+  const result = stats(rows({ sent: emailsAt(daysAgo(400), daysAgo(1)) }), "all", now);
 
   expect(result.emailsSent).toBe(2);
 });
@@ -114,7 +199,7 @@ test("The Jobs strip shows every Application In Review, emails sent this week an
         { status: "in-review", currentStep: "check-sharing", createdAt: daysAgo(1) },
         { status: "no-contacts", currentStep: "find-decision-makers", createdAt: daysAgo(35) },
       ],
-      sentAt: [daysAgo(1), daysAgo(6), daysAgo(8)],
+      sent: emailsAt(daysAgo(1), daysAgo(6), daysAgo(8)),
     }),
     now,
     "UTC",
@@ -148,7 +233,7 @@ test("Activity counts Jobs, Applications and emails per calendar day in the Admi
         { source: "LinkedIn", foundAt: daysAgo(9) },
       ],
       applications: [{ status: "sent", currentStep: "send", createdAt: daysAgo(2) }],
-      sentAt: [hoursAgo(1)],
+      sent: emailsAt(hoursAgo(1)),
     }),
     "7d",
     now,
@@ -179,7 +264,7 @@ test("Activity over 24 hours counts per hour", () => {
 });
 
 test("Activity since the start begins on the day of the oldest record", () => {
-  const result = activity(rows({ sentAt: [daysAgo(3)] }), "all", now, "UTC");
+  const result = activity(rows({ sent: emailsAt(daysAgo(3)) }), "all", now, "UTC");
 
   expect(result.map(({ bucket }) => bucket)).toEqual(["2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"]);
   expect(result[0].emailsSent).toBe(1);

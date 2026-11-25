@@ -798,6 +798,13 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
     list() {
       return selectReplies().orderBy(desc(replies.receivedAt));
     },
+
+    listForApplication(applicationId: number) {
+      return client(databaseUrl)
+        .select({ decisionMakerId: replies.decisionMakerId, receivedAt: replies.receivedAt })
+        .from(replies)
+        .where(eq(replies.applicationId, applicationId));
+    },
   };
 }
 
@@ -862,15 +869,24 @@ export async function listApplicationsWithJobs(databaseUrl: string) {
   return rows.map((row) => ({ ...row, newestRun: runByApplication.get(row.application.id) }));
 }
 
-/** What the dashboard's stats count besides Applications: each Job's source and when it was found, and each email sent. */
+/**
+ * What the dashboard's stats count besides Applications: each Job's source and when it was found, each email sent,
+ * and each Reply.
+ */
 export async function listStatsRows(databaseUrl: string) {
   const db = client(databaseUrl);
-  const jobRows = await db.select({ source: jobs.source, foundAt: jobs.foundAt }).from(jobs);
-  const sent = await db
-    .select({ sentAt: applicationRecipients.sentAt })
-    .from(applicationRecipients)
-    .where(isNotNull(applicationRecipients.sentAt));
-  return { jobs: jobRows, sentAt: sent.map(({ sentAt }) => sentAt!) };
+  const recipient = { applicationId: applicationRecipients.applicationId, decisionMakerId: applicationRecipients.decisionMakerId };
+  const [jobRows, sent, replyRows] = await Promise.all([
+    db.select({ source: jobs.source, foundAt: jobs.foundAt }).from(jobs),
+    db
+      .select({ ...recipient, sentAt: applicationRecipients.sentAt })
+      .from(applicationRecipients)
+      .where(isNotNull(applicationRecipients.sentAt)),
+    db
+      .select({ applicationId: replies.applicationId, decisionMakerId: replies.decisionMakerId, receivedAt: replies.receivedAt })
+      .from(replies),
+  ]);
+  return { jobs: jobRows, sent: sent.map((row) => ({ ...row, sentAt: row.sentAt! })), replies: replyRows };
 }
 
 /** Every Decision Maker with their Company's name and LinkedIn page, the most recently emailed first, then the most recently found. */

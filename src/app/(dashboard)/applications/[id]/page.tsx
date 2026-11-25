@@ -26,6 +26,7 @@ import {
   drizzleDecisionMakerStore,
   drizzleFunctionRunStore,
   drizzleJobStore,
+  drizzleReplyStore,
   drizzleSendSettingsStore,
   drizzleStepLogStore,
 } from "@/lib/drizzle";
@@ -282,6 +283,26 @@ function ReviewActions({ application, sendingAllowed }: { application: Applicati
   );
 }
 
+/** Whether an emailed Decision Maker replied, linking to their Reply in the Replies tab. */
+function ReplyStatus({
+  applicationId,
+  decisionMakerId,
+  repliedAt,
+  timeZone,
+}: {
+  applicationId: number;
+  decisionMakerId: number;
+  repliedAt: Date | undefined;
+  timeZone: string;
+}) {
+  if (!repliedAt) return <Tag>No reply yet</Tag>;
+  return (
+    <Link href={`/replies#reply-${applicationId}-${decisionMakerId}`} className="hover:underline">
+      <Tag tone="emerald">Replied {dateTime(repliedAt, timeZone)}</Tag>
+    </Link>
+  );
+}
+
 function Person({
   name,
   profileUrl,
@@ -325,7 +346,7 @@ export default async function ApplicationPage({
 
   const inReview = saved.status === "in-review";
   const decisionMakerStore = drizzleDecisionMakerStore(DATABASE_URL);
-  const [job, runs, recipients, company, people, resumes, logs, sendingAllowed] = await Promise.all([
+  const [job, runs, recipients, company, people, resumes, logs, sendingAllowed, replies] = await Promise.all([
     drizzleJobStore(DATABASE_URL).get(saved.jobId),
     drizzleFunctionRunStore(DATABASE_URL).listForApplication(id),
     decisionMakerStore.listForApplication(id),
@@ -334,7 +355,9 @@ export default async function ApplicationPage({
     inReview ? listResumes(saved) : [],
     drizzleStepLogStore(DATABASE_URL).listForApplication(id),
     inReview && drizzleSendSettingsStore(DATABASE_URL).sendingAllowed(),
+    drizzleReplyStore(DATABASE_URL).listForApplication(id),
   ]);
+  const repliedAt = new Map(replies.map(({ decisionMakerId, receivedAt }) => [decisionMakerId, receivedAt]));
   const now = new Date();
   // Shown as failed when its Function passed its time limit, so it can be retried.
   const application = applicationAsOf(saved, runs, now);
@@ -465,11 +488,19 @@ export default async function ApplicationPage({
                     {decisionMaker.email && <CopyButton text={decisionMaker.email} label="Copy email" />}
                   </div>
                   {sending && (
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       {decisionMaker.sentAt ? (
                         <Tag tone="emerald">Sent {dateTime(decisionMaker.sentAt, TIMEZONE)}</Tag>
                       ) : (
                         <Tag>Not sent</Tag>
+                      )}
+                      {decisionMaker.sentAt && (
+                        <ReplyStatus
+                          applicationId={application.id}
+                          decisionMakerId={decisionMaker.id}
+                          repliedAt={repliedAt.get(decisionMaker.id)}
+                          timeZone={TIMEZONE}
+                        />
                       )}
                     </div>
                   )}
