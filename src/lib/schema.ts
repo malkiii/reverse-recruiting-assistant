@@ -160,6 +160,8 @@ export const googleConnection = pgTable(
     refreshToken: text("refresh_token").notNull(),
     accessToken: text("access_token").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** The scopes the Admin granted. Empty for connections made before they were recorded, which must reconnect. */
+    scopes: text().array().notNull().default(sql`'{}'::text[]`),
   },
   singleRow,
 ).enableRLS();
@@ -259,6 +261,9 @@ export const applicationRecipients = pgTable(
       .references(() => decisionMakers.id),
     /** When their email went out, so a Send never emails them twice. */
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    /** The sent email's Gmail message and thread, so replies can be found. Null for emails sent before they were recorded. */
+    gmailMessageId: text("gmail_message_id"),
+    gmailThreadId: text("gmail_thread_id"),
   },
   (table) => [primaryKey({ columns: [table.applicationId, table.decisionMakerId] })],
 ).enableRLS();

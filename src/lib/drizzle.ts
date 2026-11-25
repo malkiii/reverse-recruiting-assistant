@@ -55,6 +55,7 @@ import type {
   JobFeedStore,
   JobStore,
   ResumeFolderStore,
+  SentEmail,
   SkippedApifyTokenStore,
 } from "./gateways";
 import {
@@ -341,6 +342,7 @@ export function drizzleGoogleConnectionStore(databaseUrl: string): GoogleConnect
           refreshToken: googleConnection.refreshToken,
           accessToken: googleConnection.accessToken,
           expiresAt: googleConnection.expiresAt,
+          scopes: googleConnection.scopes,
         })
         .from(googleConnection);
       return tokens;
@@ -693,19 +695,24 @@ export function drizzleDecisionMakerStore(databaseUrl: string): DecisionMakerSto
 
     async listForApplication(applicationId: number) {
       const rows = await client(databaseUrl)
-        .select({ decisionMaker: decisionMakers, sentAt: applicationRecipients.sentAt })
+        .select({
+          decisionMaker: decisionMakers,
+          sentAt: applicationRecipients.sentAt,
+          gmailMessageId: applicationRecipients.gmailMessageId,
+          gmailThreadId: applicationRecipients.gmailThreadId,
+        })
         .from(applicationRecipients)
         .innerJoin(decisionMakers, eq(decisionMakers.id, applicationRecipients.decisionMakerId))
         .where(eq(applicationRecipients.applicationId, applicationId))
         .orderBy(asc(decisionMakers.id));
-      return rows.map(({ decisionMaker, sentAt }) => ({ ...decisionMaker, sentAt }));
+      return rows.map(({ decisionMaker, ...sent }) => ({ ...decisionMaker, ...sent }));
     },
 
-    async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date) {
+    async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail) {
       await client(databaseUrl).transaction(async (tx) => {
         await tx
           .update(applicationRecipients)
-          .set({ sentAt })
+          .set({ sentAt, gmailMessageId: email.messageId, gmailThreadId: email.threadId })
           .where(
             and(
               eq(applicationRecipients.applicationId, applicationId),

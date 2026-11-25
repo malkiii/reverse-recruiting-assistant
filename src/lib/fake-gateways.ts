@@ -32,6 +32,7 @@ import type {
   LlmSettingsStore,
   ResumeFolderStore,
   SearchResult,
+  SentEmail,
   ActorRunStatus,
   ActorRunStore,
   AlertState,
@@ -60,6 +61,7 @@ import type {
   TelegramGateway,
   TelegramLink,
 } from "./gateways";
+import { GOOGLE_SCOPES } from "./google";
 import { COLLECT_JOBS, type JobSearch, type LlmProvider, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR, WORKING_STATUSES } from "./schema";
 
 export class FakeFunctionRunStore implements FunctionRunStore {
@@ -334,7 +336,7 @@ export class FakeGoogleOAuth implements GoogleOAuthGateway {
 
   async exchange(code: string, redirectUri: string) {
     this.exchanged.push({ code, redirectUri });
-    return { refreshToken: "refresh", ...this.grant };
+    return { refreshToken: "refresh", scopes: GOOGLE_SCOPES, ...this.grant };
   }
 
   async refresh(refreshToken: string) {
@@ -422,7 +424,13 @@ export class FakeApplicationStore implements ApplicationStore {
       (recipient) => recipient.applicationId === id && recipient.decisionMakerId === decisionMakerId,
     );
     if (added) return false;
-    this.decisionMakers.recipients.push({ applicationId: id, decisionMakerId, sentAt: null });
+    this.decisionMakers.recipients.push({
+      applicationId: id,
+      decisionMakerId,
+      sentAt: null,
+      gmailMessageId: null,
+      gmailThreadId: null,
+    });
     return true;
   }
 
@@ -663,7 +671,13 @@ export class FakeActor<Input, Result> implements ActorGateway<Input, Result> {
 export class FakeDecisionMakerStore implements DecisionMakerStore {
   saved: DecisionMaker[] = [];
   private peopleFoundAtByCompany = new Map<number, Date>();
-  recipients: { applicationId: number; decisionMakerId: number; sentAt: Date | null }[] = [];
+  recipients: {
+    applicationId: number;
+    decisionMakerId: number;
+    sentAt: Date | null;
+    gmailMessageId: string | null;
+    gmailThreadId: string | null;
+  }[] = [];
 
   async save(companyId: number, people: FoundPerson[], foundAt: Date) {
     const result: DecisionMaker[] = [];
@@ -703,28 +717,39 @@ export class FakeDecisionMakerStore implements DecisionMakerStore {
 
   async addToApplication(applicationId: number, decisionMakerIds: number[]) {
     this.recipients.push(
-      ...decisionMakerIds.map((decisionMakerId) => ({ applicationId, decisionMakerId, sentAt: null })),
+      ...decisionMakerIds.map((decisionMakerId) => ({
+        applicationId,
+        decisionMakerId,
+        sentAt: null,
+        gmailMessageId: null,
+        gmailThreadId: null,
+      })),
     );
   }
 
   async listForApplication(applicationId: number) {
     const ids = this.recipients.filter((recipient) => recipient.applicationId === applicationId);
-    return ids.flatMap(({ decisionMakerId, sentAt }) =>
-      this.saved.filter(({ id }) => id === decisionMakerId).map((saved) => ({ ...saved, sentAt })),
+    return ids.flatMap(({ decisionMakerId, sentAt, gmailMessageId, gmailThreadId }) =>
+      this.saved
+        .filter(({ id }) => id === decisionMakerId)
+        .map((saved) => ({ ...saved, sentAt, gmailMessageId, gmailThreadId })),
     );
   }
 
-  async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date) {
+  async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail) {
     this.recipients = this.recipients.map((recipient) =>
       recipient.applicationId === applicationId && recipient.decisionMakerId === decisionMakerId
-        ? { ...recipient, sentAt }
+        ? { ...recipient, sentAt, gmailMessageId: email.messageId, gmailThreadId: email.threadId }
         : recipient,
     );
     this.saved = this.saved.map((saved) => (saved.id === decisionMakerId ? { ...saved, lastEmailedAt: sentAt } : saved));
   }
 }
 
-/** Records each email sent, and fails from the email numbered `failFrom` on, counting from 1. */
+/**
+ * Records each email sent, each in its own thread numbered from 1 like its message, and fails from the email numbered
+ * `failFrom` on.
+ */
 export class FakeGmail implements GmailGateway {
   sent: Email[] = [];
   failFrom = Infinity;
@@ -734,5 +759,6 @@ export class FakeGmail implements GmailGateway {
     if (this.sent.length + 1 >= this.failFrom) throw new Error("Gmail refused the email");
     this.sent.push(email);
     this.onSend(email);
+    return { messageId: `message-${this.sent.length}`, threadId: `thread-${this.sent.length}` };
   }
 }

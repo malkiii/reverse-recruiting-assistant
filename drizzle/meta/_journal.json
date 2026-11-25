@@ -162,6 +162,13 @@
       "when": 1794144814772,
       "tag": "0022_new_default_cover_letter_instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795614443190,
+      "tag": "0023_gmail_threads_and_scopes",
+      "breakpoints": true
     }
   ]
 }

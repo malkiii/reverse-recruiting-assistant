@@ -49,8 +49,8 @@ export interface TelegramGateway {
 
 export type DriveFile = { id: string; name: string; mimeType: string; webViewLink: string };
 
-/** The Admin's Google connection: the long-lived refresh token and the latest access token. */
-export type GoogleTokens = { refreshToken: string; accessToken: string; expiresAt: Date };
+/** The Admin's Google connection: the long-lived refresh token, the latest access token, and the scopes granted. */
+export type GoogleTokens = { refreshToken: string; accessToken: string; expiresAt: Date; scopes: string[] };
 
 export interface GoogleConnectionStore {
   get(): Promise<GoogleTokens | undefined>;
@@ -78,10 +78,12 @@ export interface DriveGateway {
 }
 
 export type Email = { to: string; subject: string; body: string };
+/** Where Gmail filed a sent email, so its thread can be checked for replies. */
+export type SentEmail = { messageId: string; threadId: string };
 
 export interface GmailGateway {
   /** Sends a plain text email from the Admin's Gmail. */
-  send(email: Email): Promise<void>;
+  send(email: Email): Promise<SentEmail>;
 }
 
 export interface PdfReader {
@@ -91,7 +93,7 @@ export interface PdfReader {
 
 export interface GoogleOAuthGateway {
   /** Trades the OAuth callback's code for tokens. Throws unless every scope was granted along with a refresh token. */
-  exchange(code: string, redirectUri: string): Promise<GrantedTokens & { refreshToken: string }>;
+  exchange(code: string, redirectUri: string): Promise<GrantedTokens & { refreshToken: string; scopes: string[] }>;
   /** Null when Google no longer accepts the refresh token, because it was revoked or expired. */
   refresh(refreshToken: string): Promise<GrantedTokens | null>;
 }
@@ -287,8 +289,11 @@ export type EmployeesActor = ActorGateway<EmployeeSearch, Person>;
 export type EmailsActor = ActorGateway<string[], FoundEmail>;
 
 export type DecisionMaker = typeof decisionMakers.$inferSelect;
-/** A Decision Maker an Application emails, and when their email went out. */
-export type Recipient = DecisionMaker & { sentAt: Date | null };
+/**
+ * A Decision Maker an Application emails, when their email went out, and its Gmail message and thread. The Gmail IDs
+ * are null until sent, and for emails sent before they were recorded.
+ */
+export type Recipient = DecisionMaker & { sentAt: Date | null; gmailMessageId: string | null; gmailThreadId: string | null };
 export type FoundPerson = Pick<DecisionMaker, "name" | "headline" | "profileUrl" | "photo" | "email" | "jobFunction">;
 
 export interface DecisionMakerStore {
@@ -304,8 +309,8 @@ export interface DecisionMakerStore {
   /** Makes them the Application's Decision Makers. */
   addToApplication(applicationId: number, decisionMakerIds: number[]): Promise<void>;
   listForApplication(applicationId: number): Promise<Recipient[]>;
-  /** Records the recipient's email as sent and starts the Decision Maker's Cooldown, together. */
-  recordSent(applicationId: number, decisionMakerId: number, sentAt: Date): Promise<void>;
+  /** Records the recipient's email as sent, with its Gmail IDs, and starts the Decision Maker's Cooldown, together. */
+  recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail): Promise<void>;
 }
 
 export interface CompanyPageSearch {

@@ -1,8 +1,9 @@
 import type { DriveFile, DriveFolder, DriveGateway, Email, GmailGateway, GoogleOAuthGateway, GrantedTokens } from "./gateways";
 
-/** The only scopes the agent asks for: it sends Applications and reads the Resume Folder. */
+/** The only scopes the agent asks for: it sends Applications, reads their Gmail threads for replies, and reads the Resume Folder. */
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
 ];
 
@@ -50,7 +51,7 @@ export function googleOAuth(clientId: string, clientSecret: string): GoogleOAuth
       const missing = GOOGLE_SCOPES.filter((scope) => !scopes.includes(scope));
       if (missing.length > 0) throw new Error(`Google access wasn't granted for: ${missing.join(", ")}`);
       if (!tokens.refresh_token) throw new Error("Google returned no refresh token");
-      return { ...granted(tokens), refreshToken: tokens.refresh_token };
+      return { ...granted(tokens), refreshToken: tokens.refresh_token, scopes };
     },
 
     async refresh(refreshToken: string) {
@@ -146,6 +147,8 @@ export function googleGmail(accessToken: string): GmailGateway {
         body: JSON.stringify({ raw: Buffer.from(mimeMessage(email), "utf8").toString("base64url") }),
       });
       if (!response.ok) throw new Error(`Gmail refused the email: ${response.status} ${await response.text()}`);
+      const { id, threadId } = (await response.json()) as { id: string; threadId: string };
+      return { messageId: id, threadId };
     },
   };
 }
