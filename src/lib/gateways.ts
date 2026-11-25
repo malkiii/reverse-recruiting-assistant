@@ -347,6 +347,8 @@ export type ReplyMessage = Pick<ThreadMessage, "gmailMessageId" | "fromName" | "
 /** A Reply with the Decision Maker, Job and Company of the Application it answers. */
 export type Reply = typeof replies.$inferSelect & {
   decisionMakerName: string;
+  decisionMakerHeadline: string;
+  decisionMakerPhoto: string | null;
   jobTitle: string;
   companyName: string;
 };

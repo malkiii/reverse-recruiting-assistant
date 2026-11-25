@@ -782,9 +782,13 @@ export class FakeGmailReader implements GmailReader {
   }
 }
 
-/** Watches the threads set in `watched`, and joins each saved Reply to its watched thread's Job and Decision Maker. */
+/**
+ * Watches the threads set in `watched`, and joins each saved Reply to its watched thread's Job and Decision Maker,
+ * with the Decision Maker's headline and photo when set in `profiles`.
+ */
 export class FakeReplyStore implements ReplyStore {
   watched: WatchedThread[] = [];
+  profiles = new Map<number, { headline: string; photo: string | null }>();
   private saved: (ReplyMessage & { applicationId: number; decisionMakerId: number; alertedAt: Date | null })[] = [];
 
   private details(reply: (typeof this.saved)[number]): Reply {
@@ -794,6 +798,8 @@ export class FakeReplyStore implements ReplyStore {
     return {
       ...reply,
       decisionMakerName: thread.decisionMakerName,
+      decisionMakerHeadline: this.profiles.get(reply.decisionMakerId)?.headline ?? "",
+      decisionMakerPhoto: this.profiles.get(reply.decisionMakerId)?.photo ?? null,
       jobTitle: thread.jobTitle,
       companyName: thread.companyName,
     };

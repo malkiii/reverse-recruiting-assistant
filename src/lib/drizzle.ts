@@ -743,6 +743,8 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
       .select({
         ...getTableColumns(replies),
         decisionMakerName: decisionMakers.name,
+        decisionMakerHeadline: decisionMakers.headline,
+        decisionMakerPhoto: decisionMakers.photo,
         jobTitle: jobs.title,
         companyName: jobs.companyName,
       })
