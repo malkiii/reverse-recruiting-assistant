@@ -271,21 +271,20 @@ export const applicationRecipients = pgTable(
 ).enableRLS();
 
 /**
- * A recipient's Reply: the latest message in their Gmail thread not sent by the Admin. A newer one replaces it, and
- * `alertedAt` stays null until its Telegram alert goes out. Deleted with its recipient.
+ * A recipient's Reply: the latest message in their Gmail thread not sent by the Admin. A newer one replaces it.
+ * Deleted with its recipient.
  */
 export const replies = pgTable(
   "replies",
   {
     applicationId: bigint("application_id", { mode: "number" }).notNull(),
     decisionMakerId: bigint("decision_maker_id", { mode: "number" }).notNull(),
-    /** The latest reply's Gmail message, so it isn't saved or alerted twice. */
+    /** The latest reply's Gmail message, so it isn't saved twice. */
     gmailMessageId: text("gmail_message_id").notNull(),
     fromName: text("from_name").notNull(),
     fromEmail: text("from_email").notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
     text: text().notNull(),
-    alertedAt: timestamp("alerted_at", { withTimezone: true }),
   },
   (table) => [
     primaryKey({ columns: [table.applicationId, table.decisionMakerId] }),

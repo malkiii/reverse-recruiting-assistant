@@ -1,43 +1,27 @@
-import type { GmailReader, Reply, ReplyStore, TelegramGateway, WatchedThread } from "./gateways";
+import type { FunctionRun, GmailReader, ReplyStore, WatchedThread } from "./gateways";
 import { GoogleConnectionError } from "./google-connection";
-import { escapeHtml } from "./telegram";
+import { CHECK_REPLIES } from "./schema";
 
 export const REPLY_CHECK_TIME_LIMIT_MS = 10 * 60_000;
 
 /** How long a sent email's thread is watched for replies, the same as the Cooldown. */
 export const REPLY_WATCH_DAYS = 30;
 
-const PREVIEW_LENGTH = 200;
 const DAY_MS = 24 * 60 * 60_000;
 
 export type ReplyCheckDeps = {
   replies: ReplyStore;
   /** Only asked for when there is a thread to read. */
   gmailReader: () => Promise<GmailReader>;
-  telegram: TelegramGateway;
-  dashboardUrl: string;
   now: () => Date;
 };
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-const preview = (text: string) => {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > PREVIEW_LENGTH ? `${flat.slice(0, PREVIEW_LENGTH)}…` : flat;
-};
-
-const replyAlert = ({ fromName, fromEmail, jobTitle, companyName, text }: Reply) =>
-  [
-    "💬 <b>New reply</b>",
-    `👤 ${escapeHtml(fromName)} (${escapeHtml(fromEmail)})\n💼 ${escapeHtml(jobTitle)}\n🏢 ${escapeHtml(companyName)}`,
-    `<i>${escapeHtml(preview(text))}</i>`,
-  ].join("\n\n");
-
 /**
- * The Reply Check: reads the Gmail thread of every email sent in the last 30 days, saves each recipient's latest reply,
- * then alerts the Admin of each new one. A failed thread or alert doesn't stop the others; it fails the run once all are
- * done, and an unsent alert is retried on the next run. When Google needs reconnecting, no thread is read but the run
- * doesn't fail, so it doesn't raise a Failure Alert every hour until the Admin reconnects.
+ * The Reply Check, run by the Admin: reads the Gmail thread of every email sent in the last 30 days and saves each
+ * recipient's latest reply. A failed thread doesn't stop the others; it fails the run once all are done. When Google
+ * needs reconnecting, no thread is read and the run doesn't fail.
  */
 export async function runReplyCheck(deps: ReplyCheckDeps) {
   const { replies, now } = deps;
@@ -57,10 +41,17 @@ export async function runReplyCheck(deps: ReplyCheckDeps) {
     }
   }
 
-  await sendReplyAlerts(deps, errors);
-
   console.log(`Reply Check finished with ${errors.length} error(s)`);
   if (errors.length > 0) throw new Error(errors.join("; "));
+}
+
+export function isReplyCheckActive(runs: FunctionRun[], now: Date) {
+  return runs.some(
+    ({ functionName, status, startedAt }) =>
+      functionName === CHECK_REPLIES &&
+      status === "running" &&
+      now.getTime() - startedAt.getTime() < REPLY_CHECK_TIME_LIMIT_MS,
+  );
 }
 
 /** Undefined when Google needs reconnecting, such as for a missing scope. */
@@ -82,20 +73,4 @@ async function checkThread(gmail: GmailReader, replies: ReplyStore, thread: Watc
   const { fromAdmin: _fromAdmin, ...reply } = latest;
   await replies.save(thread, reply);
   console.log(`Application ${thread.applicationId}: new reply from ${reply.fromEmail}`);
-}
-
-async function sendReplyAlerts({ replies, telegram, dashboardUrl, now }: ReplyCheckDeps, errors: string[]) {
-  const link = { label: "💬 See Replies", url: new URL("/replies", dashboardUrl).toString() };
-  const pending = await replies.listPendingAlerts();
-  for (const reply of pending) {
-    try {
-      await telegram.sendHtml(replyAlert(reply), link);
-    } catch (error) {
-      // Left pending, so the next Reply Check retries it.
-      console.error(`Reply Alert for ${reply.fromEmail}: failed:`, error);
-      errors.push(`Reply Alert for ${reply.fromEmail}: ${message(error)}`);
-      continue;
-    }
-    await replies.markAlerted(reply, reply.gmailMessageId, now());
-  }
 }

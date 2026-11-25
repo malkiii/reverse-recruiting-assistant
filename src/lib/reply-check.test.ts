@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { FakeGmailReader, FakeReplyStore, FakeTelegram } from "./fake-gateways";
+import { FakeGmailReader, FakeReplyStore } from "./fake-gateways";
 import type { ThreadMessage, WatchedThread } from "./gateways";
 import { GoogleConnectionError } from "./google-connection";
 import { runReplyCheck } from "./reply-check";
@@ -46,8 +46,6 @@ function setup(threads: WatchedThread[] = [thread()]) {
     replies,
     gmail,
     gmailReader: async () => gmail,
-    telegram: new FakeTelegram(),
-    dashboardUrl: "https://dashboard.example.com",
     now: () => now,
   };
 }
@@ -81,7 +79,6 @@ test("the Admin's own messages in the thread are never counted as replies", asyn
   await runReplyCheck(deps);
 
   expect(await deps.replies.list()).toEqual([]);
-  expect(deps.telegram.sent).toEqual([]);
 });
 
 test("only threads emailed in the last 30 days are checked", async () => {
@@ -95,42 +92,7 @@ test("only threads emailed in the last 30 days are checked", async () => {
   expect((await deps.replies.list()).map(({ decisionMakerId }) => decisionMakerId)).toEqual([10]);
 });
 
-test("a new reply alerts the Admin with who replied, the Job, a preview and a link to the Replies tab", async () => {
-  const deps = setup();
-  deps.gmail.threads.set("thread-1", [adminMessage, reply({ text: "Thanks <3,\n\n  let's   talk on Monday." })]);
-
-  await runReplyCheck(deps);
-
-  expect(deps.telegram.messages).toEqual([
-    {
-      text: "💬 <b>New reply</b>\n\n👤 Jane Doe (jane@acme.com)\n💼 Backend Engineer\n🏢 Acme\n\n<i>Thanks &lt;3, let's talk on Monday.</i>",
-      link: { label: "💬 See Replies", url: "https://dashboard.example.com/replies" },
-      html: true,
-    },
-  ]);
-});
-
-test("a long reply's preview is cut short", async () => {
-  const deps = setup();
-  deps.gmail.threads.set("thread-1", [adminMessage, reply({ text: "x".repeat(500) })]);
-
-  await runReplyCheck(deps);
-
-  const [{ text }] = deps.telegram.messages;
-  expect(text).toContain(`<i>${"x".repeat(200)}…</i>`);
-});
-
-test("a reply is alerted once, never again on later runs", async () => {
-  const deps = setup();
-  deps.gmail.threads.set("thread-1", [adminMessage, reply()]);
-
-  await runReplyCheck(deps);
-  await runReplyCheck(deps);
-
-  expect(deps.telegram.sent).toHaveLength(1);
-});
-
-test("a newer reply in the thread replaces the stored one and is alerted", async () => {
+test("a newer reply in the thread replaces the stored one", async () => {
   const deps = setup();
   deps.gmail.threads.set("thread-1", [adminMessage, reply()]);
   await runReplyCheck(deps);
@@ -143,8 +105,6 @@ test("a newer reply in the thread replaces the stored one and is alerted", async
   await runReplyCheck(deps);
 
   expect(await deps.replies.list()).toMatchObject([{ gmailMessageId: "reply-2", text: "Monday 10am works." }]);
-  expect(deps.telegram.sent).toHaveLength(2);
-  expect(deps.telegram.sent[1]).toContain("Monday 10am works.");
 });
 
 test("a Gmail error on one thread doesn't stop the others, and fails the run", async () => {
@@ -155,19 +115,6 @@ test("a Gmail error on one thread doesn't stop the others, and fails the run", a
   await expect(runReplyCheck(deps)).rejects.toThrow("thread-1");
 
   expect((await deps.replies.list()).map(({ decisionMakerId }) => decisionMakerId)).toEqual([11]);
-  expect(deps.telegram.sent).toHaveLength(1);
-});
-
-test("a reply whose alert failed is alerted on the next run", async () => {
-  const deps = setup();
-  deps.gmail.threads.set("thread-1", [adminMessage, reply()]);
-  deps.telegram.failing = true;
-  await expect(runReplyCheck(deps)).rejects.toThrow("Telegram is down");
-
-  deps.telegram.failing = false;
-  await runReplyCheck(deps);
-
-  expect(deps.telegram.sent).toHaveLength(1);
 });
 
 test("with no thread to check, Google isn't asked for access", async () => {
@@ -176,24 +123,20 @@ test("with no thread to check, Google isn't asked for access", async () => {
     throw new Error("Google isn't connected");
   };
 
-  await runReplyCheck(deps);
-
-  expect(deps.telegram.sent).toEqual([]);
+  await expect(runReplyCheck(deps)).resolves.toBeUndefined();
 });
 
-test("when Google needs reconnecting, the run ends without error and still sends pending Reply Alerts", async () => {
+test("when Google needs reconnecting, the run ends without error and reads no thread", async () => {
   const deps = setup();
   deps.gmail.threads.set("thread-1", [adminMessage, reply()]);
-  deps.telegram.failing = true;
-  await expect(runReplyCheck(deps)).rejects.toThrow("Telegram is down");
-
-  deps.telegram.failing = false;
   deps.gmailReader = async () => {
     throw new GoogleConnectionError("The agent needs more Google access: reconnect Google on the dashboard's Google page");
   };
+
   await runReplyCheck(deps);
 
-  expect(deps.telegram.sent).toHaveLength(1);
+  expect(deps.gmail.read).toEqual([]);
+  expect(await deps.replies.list()).toEqual([]);
 });
 
 test("any other error getting Gmail access fails the run", async () => {

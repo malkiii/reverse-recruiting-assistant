@@ -11,7 +11,6 @@ const reply = (overrides: Partial<Reply> = {}): Reply => ({
   fromEmail: "jane@acme.com",
   receivedAt: new Date("2026-11-24T09:30:00Z"),
   text: "Thanks, let's talk on Monday.",
-  alertedAt: null,
   decisionMakerName: "Jane Doe",
   decisionMakerEmail: "jane@acme.com",
   decisionMakerHeadline: "CTO at Acme",
