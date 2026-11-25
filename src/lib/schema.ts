@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   integer,
   jsonb,
   pgTable,
@@ -17,6 +18,7 @@ import {
 export const COLLECT_JOBS = "collect-jobs";
 export const PREPARE_APPLICATION = "prepare-application";
 export const SEND_APPLICATION = "send-application";
+export const CHECK_REPLIES = "check-replies";
 
 /** The error on a Function run that passed its time limit, as Modal killed it without a word. */
 export const PASSED_TIME_LIMIT_ERROR = "Passed its time limit";
@@ -160,6 +162,8 @@ export const googleConnection = pgTable(
     refreshToken: text("refresh_token").notNull(),
     accessToken: text("access_token").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** The scopes the Admin granted. Empty for connections made before they were recorded, which must reconnect. */
+    scopes: text().array().notNull().default(sql`'{}'::text[]`),
   },
   singleRow,
 ).enableRLS();
@@ -259,8 +263,38 @@ export const applicationRecipients = pgTable(
       .references(() => decisionMakers.id),
     /** When their email went out, so a Send never emails them twice. */
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    /** The sent email's Gmail message and thread, so replies can be found. Null for emails sent before they were recorded. */
+    gmailMessageId: text("gmail_message_id"),
+    gmailThreadId: text("gmail_thread_id"),
   },
   (table) => [primaryKey({ columns: [table.applicationId, table.decisionMakerId] })],
+).enableRLS();
+
+/**
+ * A recipient's Reply: the latest message in their Gmail thread not sent by the Admin. A newer one replaces it, and
+ * `alertedAt` stays null until its Telegram alert goes out. Deleted with its recipient.
+ */
+export const replies = pgTable(
+  "replies",
+  {
+    applicationId: bigint("application_id", { mode: "number" }).notNull(),
+    decisionMakerId: bigint("decision_maker_id", { mode: "number" }).notNull(),
+    /** The latest reply's Gmail message, so it isn't saved or alerted twice. */
+    gmailMessageId: text("gmail_message_id").notNull(),
+    fromName: text("from_name").notNull(),
+    fromEmail: text("from_email").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    text: text().notNull(),
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationId, table.decisionMakerId] }),
+    foreignKey({
+      name: "replies_recipient_fk",
+      columns: [table.applicationId, table.decisionMakerId],
+      foreignColumns: [applicationRecipients.applicationId, applicationRecipients.decisionMakerId],
+    }).onDelete("cascade"),
+  ],
 ).enableRLS();
 
 /** One attempt at one Application step, shown on the dashboard. */

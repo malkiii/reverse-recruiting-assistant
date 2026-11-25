@@ -11,6 +11,7 @@ CLI = ["npx", "tsx", "src/functions/cli.ts"]
 COLLECT_JOBS_TIMEOUT = 30 * 60  # COLLECTION_TIME_LIMIT_MS in src/lib/job-collection.ts
 PREPARE_APPLICATION_TIMEOUT = 30 * 60  # PREPARE_TIME_LIMIT_MS in src/lib/application-lifecycle.ts
 SEND_APPLICATION_TIMEOUT = 10 * 60  # SEND_TIME_LIMIT_MS in src/lib/application-lifecycle.ts
+CHECK_REPLIES_TIMEOUT = 10 * 60  # REPLY_CHECK_TIME_LIMIT_MS in src/lib/reply-check.ts
 # Read where `modal deploy` runs, because Modal resolves schedules at deploy time.
 TIMEZONE = os.environ.get("TIMEZONE") or "UTC"
 
@@ -46,6 +47,12 @@ def send_application(run_id: int, application_id: int):
 @app.function(timeout=COLLECT_JOBS_TIMEOUT, schedule=modal.Cron("0 10 * * *", timezone=TIMEZONE))
 def scheduled_collect_jobs():
     subprocess.run([*CLI, "scheduled", "collect-jobs"], cwd=APP_DIR, check=True)
+
+
+# The Reply Check reads the Gmail threads of emails sent in the last 30 days for new replies.
+@app.function(timeout=CHECK_REPLIES_TIMEOUT, schedule=modal.Cron("0 * * * *", timezone=TIMEZONE))
+def scheduled_check_replies():
+    subprocess.run([*CLI, "scheduled", "check-replies"], cwd=APP_DIR, check=True)
 
 
 @app.function()

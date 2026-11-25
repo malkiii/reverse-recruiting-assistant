@@ -54,6 +54,11 @@ const TABS = [
     ),
   },
   {
+    href: "/replies",
+    label: "Replies",
+    icon: icon(<path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v5" />),
+  },
+  {
     href: "/resumes",
     label: "Resumes",
     icon: icon(

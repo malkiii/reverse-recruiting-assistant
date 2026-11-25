@@ -465,7 +465,7 @@ test("a Send whose Function passed its time limit can be retried, emailing only 
   const [ann] = await deps.decisionMakers.listForApplication(id);
   // Modal kills the Function after Ann's email.
   await deps.runs.start(SEND_APPLICATION, now, SEND_TIME_LIMIT_MS, id);
-  await deps.decisionMakers.recordSent(id, ann.id, now);
+  await deps.decisionMakers.recordSent(id, ann.id, now, { messageId: "message-ann", threadId: "thread-ann" });
 
   expect(await retrySend(deps, id)).toEqual({ outcome: "not-failed" });
   deps.now = () => minutesAfter(now, 10);
@@ -1226,6 +1226,23 @@ test("Send emails each Decision Maker from the Admin's Gmail, a few seconds apar
   expect(await deps.decisionMakers.listForApplication(id)).toMatchObject([
     { name: "Ann", sentAt: sendTime, lastEmailedAt: sendTime },
     { name: "Bob", sentAt: sendTime, lastEmailedAt: sendTime },
+  ]);
+});
+
+test("Send records each email's Gmail message and thread, so replies can be found later", async () => {
+  const deps = await setup();
+  const id = await reachReview(deps);
+  await send(deps, id);
+
+  expect(await deps.decisionMakers.listForApplication(id)).toMatchObject([
+    { name: "Ann", gmailMessageId: null, gmailThreadId: null },
+    { name: "Bob", gmailMessageId: null, gmailThreadId: null },
+  ]);
+  await runSending(deps, id);
+
+  expect(await deps.decisionMakers.listForApplication(id)).toMatchObject([
+    { name: "Ann", gmailMessageId: "message-1", gmailThreadId: "thread-1" },
+    { name: "Bob", gmailMessageId: "message-2", gmailThreadId: "thread-2" },
   ]);
 });
 

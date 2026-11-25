@@ -17,6 +17,7 @@ import {
   drizzleJobBoardSettingsStore,
   drizzleJobFeedStore,
   drizzleJobStore,
+  drizzleReplyStore,
   drizzleSkippedApifyTokenStore,
   drizzleStepLogStore,
 } from "../lib/drizzle";
@@ -25,7 +26,7 @@ import { parseFunctionsEnv } from "../lib/env";
 import { firecrawlCompanyPageSearch } from "../lib/firecrawl-company-page";
 import { firecrawlJobFeedReader } from "../lib/firecrawl-job-feed";
 import { firecrawlJobPageReader } from "../lib/firecrawl-job-page";
-import { googleDrive, googleGmail, googleOAuth } from "../lib/google";
+import { googleDrive, googleGmail, googleGmailReader, googleOAuth } from "../lib/google";
 import { googleAccessToken } from "../lib/google-connection";
 import { glassdoorJobBoard } from "../lib/glassdoor-job-board";
 import { webImageGateway } from "../lib/images";
@@ -34,7 +35,8 @@ import { runCollection } from "../lib/job-collection";
 import { linkedInJobBoard } from "../lib/linkedin-job-board";
 import { llmGateway } from "../lib/llm";
 import { pdfReader } from "../lib/pdf";
-import { COLLECT_JOBS, PREPARE_APPLICATION, SEND_APPLICATION } from "../lib/schema";
+import { runReplyCheck } from "../lib/reply-check";
+import { CHECK_REPLIES, COLLECT_JOBS, PREPARE_APPLICATION, SEND_APPLICATION } from "../lib/schema";
 import { telegramGateway } from "../lib/telegram";
 import { InvalidFunctionRequestError } from "./accept-function-request";
 
@@ -45,6 +47,8 @@ type FunctionDefinition = {
   /** Claims the Application named in the request body. Null when it isn't in a startable state. */
   claim?: (services: Services, body: unknown) => Promise<number | null>;
   work: (services: Services, applicationId?: number) => Promise<void>;
+  /** Whether the Modal schedule runs it this time. Always, when not given. */
+  scheduled?: (services: Services) => Promise<boolean>;
 };
 
 /** A Prepare names the Job; a Retry names the failed Application. */
@@ -63,7 +67,15 @@ function requireApplication(applicationId: number | undefined) {
 
 export const functions = new Map<string, FunctionDefinition>([
   ["noop", { timeLimitMs: FUNCTION_TIME_LIMITS_MS.noop, work: async () => {} }],
-  [COLLECT_JOBS, { timeLimitMs: FUNCTION_TIME_LIMITS_MS[COLLECT_JOBS], work: runCollection }],
+  [
+    COLLECT_JOBS,
+    {
+      timeLimitMs: FUNCTION_TIME_LIMITS_MS[COLLECT_JOBS],
+      work: runCollection,
+      scheduled: (services) => services.scheduleSettings.collectionEnabled(),
+    },
+  ],
+  [CHECK_REPLIES, { timeLimitMs: FUNCTION_TIME_LIMITS_MS[CHECK_REPLIES], work: runReplyCheck }],
   [
     PREPARE_APPLICATION,
     {
@@ -152,6 +164,8 @@ export function functionServices() {
     coverLetterInstructions: () => drizzleCoverLetterSettingsStore(DATABASE_URL).instructions(),
     pdfs: pdfReader,
     gmail: async () => googleGmail(await accessToken()),
+    gmailReader: async () => googleGmailReader(await accessToken()),
+    replies: drizzleReplyStore(DATABASE_URL),
     sendingAllowed: async () => !DISABLE_SEND && (await drizzleSendSettingsStore(DATABASE_URL).sendingAllowed()),
   };
 }

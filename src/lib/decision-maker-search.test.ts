@@ -29,7 +29,7 @@ test("The Decision Makers are the Recipients, and everyone else found at the Com
     person("dee", { lastEmailedAt: daysAgo(31) }),
   ];
 
-  const { decisionMakers, alsoFound } = groupPeople(people, [{ ...ada, sentAt: null }], now);
+  const { decisionMakers, alsoFound } = groupPeople(people, [{ ...ada, sentAt: null, gmailMessageId: null, gmailThreadId: null }], now);
 
   expect(decisionMakers.map(({ name }) => name)).toEqual(["ada"]);
   expect(alsoFound.map(({ name, reason }) => [name, reason])).toEqual([

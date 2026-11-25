@@ -1,8 +1,19 @@
-import type { DriveFile, DriveFolder, DriveGateway, Email, GmailGateway, GoogleOAuthGateway, GrantedTokens } from "./gateways";
+import type {
+  DriveFile,
+  DriveFolder,
+  DriveGateway,
+  Email,
+  GmailGateway,
+  GmailReader,
+  GoogleOAuthGateway,
+  GrantedTokens,
+  ThreadMessage,
+} from "./gateways";
 
-/** The only scopes the agent asks for: it sends Applications and reads the Resume Folder. */
+/** The only scopes the agent asks for: it sends Applications, reads their Gmail threads for replies, and reads the Resume Folder. */
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
 ];
 
@@ -50,7 +61,7 @@ export function googleOAuth(clientId: string, clientSecret: string): GoogleOAuth
       const missing = GOOGLE_SCOPES.filter((scope) => !scopes.includes(scope));
       if (missing.length > 0) throw new Error(`Google access wasn't granted for: ${missing.join(", ")}`);
       if (!tokens.refresh_token) throw new Error("Google returned no refresh token");
-      return { ...granted(tokens), refreshToken: tokens.refresh_token };
+      return { ...granted(tokens), refreshToken: tokens.refresh_token, scopes };
     },
 
     async refresh(refreshToken: string) {
@@ -146,6 +157,77 @@ export function googleGmail(accessToken: string): GmailGateway {
         body: JSON.stringify({ raw: Buffer.from(mimeMessage(email), "utf8").toString("base64url") }),
       });
       if (!response.ok) throw new Error(`Gmail refused the email: ${response.status} ${await response.text()}`);
+      const { id, threadId } = (await response.json()) as { id: string; threadId: string };
+      return { messageId: id, threadId };
+    },
+  };
+}
+
+const GMAIL_THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
+
+type GmailPart = {
+  mimeType?: string;
+  headers?: { name: string; value: string }[];
+  body?: { data?: string };
+  parts?: GmailPart[];
+};
+
+export type GmailMessage = { id: string; labelIds?: string[]; internalDate: string; snippet?: string; payload: GmailPart };
+
+/** The first part of the type, depth first, decoded. */
+function partText(part: GmailPart, mimeType: string): string | undefined {
+  if (part.mimeType === mimeType && part.body?.data) return Buffer.from(part.body.data, "base64url").toString("utf8");
+  for (const child of part.parts ?? []) {
+    const text = partText(child, mimeType);
+    if (text !== undefined) return text;
+  }
+}
+
+const htmlText = (html: string) =>
+  html
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replaceAll("&nbsp;", " ")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&");
+
+/** `"Jane Doe" <jane@acme.com>` as its name and address. The address stands for a missing name. */
+function sender(from: string) {
+  const match = from.match(/^\s*"?(.*?)"?\s*<([^>]+)>\s*$/);
+  if (!match) return { fromName: from.trim(), fromEmail: from.trim() };
+  const fromEmail = match[2].trim();
+  return { fromName: match[1].trim() || fromEmail, fromEmail };
+}
+
+/** A Gmail API message, in the full format, as a thread message. Its plain text body is preferred over its HTML. */
+export function threadMessage({ id, labelIds = [], internalDate, snippet, payload }: GmailMessage): ThreadMessage {
+  const from = payload.headers?.find(({ name }) => name.toLowerCase() === "from")?.value ?? "";
+  const html = partText(payload, "text/html");
+  const text = partText(payload, "text/plain") ?? (html !== undefined ? htmlText(html) : (snippet ?? ""));
+  return {
+    gmailMessageId: id,
+    ...sender(from),
+    receivedAt: new Date(Number(internalDate)),
+    text: text.trim(),
+    fromAdmin: labelIds.includes("SENT") || labelIds.includes("DRAFT"),
+  };
+}
+
+export function googleGmailReader(accessToken: string): GmailReader {
+  return {
+    async readThread(threadId: string) {
+      const url = new URL(`${GMAIL_THREADS_URL}/${encodeURIComponent(threadId)}`);
+      url.searchParams.set("format", "full");
+      const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+      // The Admin deleted the thread, so there is nothing left to check.
+      if (response.status === 404) return [];
+      if (!response.ok) throw new Error(`Gmail refused to read the thread: ${response.status} ${await response.text()}`);
+      const { messages = [] } = (await response.json()) as { messages?: GmailMessage[] };
+      return messages.map(threadMessage);
     },
   };
 }

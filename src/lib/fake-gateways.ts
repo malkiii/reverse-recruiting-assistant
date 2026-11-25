@@ -32,6 +32,7 @@ import type {
   LlmSettingsStore,
   ResumeFolderStore,
   SearchResult,
+  SentEmail,
   ActorRunStatus,
   ActorRunStore,
   AlertState,
@@ -56,10 +57,18 @@ import type {
   JobFeedStore,
   JobStore,
   PlaceholderName,
+  GmailReader,
+  RecipientKey,
+  Reply,
+  ReplyMessage,
+  ReplyStore,
+  ThreadMessage,
+  WatchedThread,
   SkippedApifyTokenStore,
   TelegramGateway,
   TelegramLink,
 } from "./gateways";
+import { GOOGLE_SCOPES } from "./google";
 import { COLLECT_JOBS, type JobSearch, type LlmProvider, PASSED_TIME_LIMIT_ERROR, RETRIED_AFTER_TIME_LIMIT_ERROR, WORKING_STATUSES } from "./schema";
 
 export class FakeFunctionRunStore implements FunctionRunStore {
@@ -334,7 +343,7 @@ export class FakeGoogleOAuth implements GoogleOAuthGateway {
 
   async exchange(code: string, redirectUri: string) {
     this.exchanged.push({ code, redirectUri });
-    return { refreshToken: "refresh", ...this.grant };
+    return { refreshToken: "refresh", scopes: GOOGLE_SCOPES, ...this.grant };
   }
 
   async refresh(refreshToken: string) {
@@ -422,7 +431,13 @@ export class FakeApplicationStore implements ApplicationStore {
       (recipient) => recipient.applicationId === id && recipient.decisionMakerId === decisionMakerId,
     );
     if (added) return false;
-    this.decisionMakers.recipients.push({ applicationId: id, decisionMakerId, sentAt: null });
+    this.decisionMakers.recipients.push({
+      applicationId: id,
+      decisionMakerId,
+      sentAt: null,
+      gmailMessageId: null,
+      gmailThreadId: null,
+    });
     return true;
   }
 
@@ -663,7 +678,13 @@ export class FakeActor<Input, Result> implements ActorGateway<Input, Result> {
 export class FakeDecisionMakerStore implements DecisionMakerStore {
   saved: DecisionMaker[] = [];
   private peopleFoundAtByCompany = new Map<number, Date>();
-  recipients: { applicationId: number; decisionMakerId: number; sentAt: Date | null }[] = [];
+  recipients: {
+    applicationId: number;
+    decisionMakerId: number;
+    sentAt: Date | null;
+    gmailMessageId: string | null;
+    gmailThreadId: string | null;
+  }[] = [];
 
   async save(companyId: number, people: FoundPerson[], foundAt: Date) {
     const result: DecisionMaker[] = [];
@@ -703,28 +724,39 @@ export class FakeDecisionMakerStore implements DecisionMakerStore {
 
   async addToApplication(applicationId: number, decisionMakerIds: number[]) {
     this.recipients.push(
-      ...decisionMakerIds.map((decisionMakerId) => ({ applicationId, decisionMakerId, sentAt: null })),
+      ...decisionMakerIds.map((decisionMakerId) => ({
+        applicationId,
+        decisionMakerId,
+        sentAt: null,
+        gmailMessageId: null,
+        gmailThreadId: null,
+      })),
     );
   }
 
   async listForApplication(applicationId: number) {
     const ids = this.recipients.filter((recipient) => recipient.applicationId === applicationId);
-    return ids.flatMap(({ decisionMakerId, sentAt }) =>
-      this.saved.filter(({ id }) => id === decisionMakerId).map((saved) => ({ ...saved, sentAt })),
+    return ids.flatMap(({ decisionMakerId, sentAt, gmailMessageId, gmailThreadId }) =>
+      this.saved
+        .filter(({ id }) => id === decisionMakerId)
+        .map((saved) => ({ ...saved, sentAt, gmailMessageId, gmailThreadId })),
     );
   }
 
-  async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date) {
+  async recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail) {
     this.recipients = this.recipients.map((recipient) =>
       recipient.applicationId === applicationId && recipient.decisionMakerId === decisionMakerId
-        ? { ...recipient, sentAt }
+        ? { ...recipient, sentAt, gmailMessageId: email.messageId, gmailThreadId: email.threadId }
         : recipient,
     );
     this.saved = this.saved.map((saved) => (saved.id === decisionMakerId ? { ...saved, lastEmailedAt: sentAt } : saved));
   }
 }
 
-/** Records each email sent, and fails from the email numbered `failFrom` on, counting from 1. */
+/**
+ * Records each email sent, each in its own thread numbered from 1 like its message, and fails from the email numbered
+ * `failFrom` on.
+ */
 export class FakeGmail implements GmailGateway {
   sent: Email[] = [];
   failFrom = Infinity;
@@ -734,5 +766,87 @@ export class FakeGmail implements GmailGateway {
     if (this.sent.length + 1 >= this.failFrom) throw new Error("Gmail refused the email");
     this.sent.push(email);
     this.onSend(email);
+    return { messageId: `message-${this.sent.length}`, threadId: `thread-${this.sent.length}` };
+  }
+}
+
+/** Serves the threads set here by ID, and throws for the ones in `failing`. Records each thread read. */
+export class FakeGmailReader implements GmailReader {
+  threads = new Map<string, ThreadMessage[]>();
+  failing = new Set<string>();
+  read: string[] = [];
+
+  async readThread(threadId: string) {
+    this.read.push(threadId);
+    if (this.failing.has(threadId)) throw new Error(`Gmail refused to read ${threadId}`);
+    return this.threads.get(threadId) ?? [];
+  }
+}
+
+const sameRecipient = (a: RecipientKey, b: RecipientKey) =>
+  a.applicationId === b.applicationId && a.decisionMakerId === b.decisionMakerId;
+
+/**
+ * Watches the threads set in `watched`, and joins each saved Reply to its watched thread's Job and Decision Maker,
+ * with the Decision Maker's email, headline and photo when set in `profiles`.
+ */
+export class FakeReplyStore implements ReplyStore {
+  watched: WatchedThread[] = [];
+  profiles = new Map<number, { email?: string; headline: string; photo: string | null }>();
+  private saved: (ReplyMessage & RecipientKey & { alertedAt: Date | null })[] = [];
+
+  private details(reply: (typeof this.saved)[number]): Reply {
+    const thread = this.watched.find((watched) => sameRecipient(watched, reply))!;
+    return {
+      ...reply,
+      decisionMakerName: thread.decisionMakerName,
+      decisionMakerEmail: this.profiles.get(reply.decisionMakerId)?.email ?? null,
+      decisionMakerHeadline: this.profiles.get(reply.decisionMakerId)?.headline ?? "",
+      decisionMakerPhoto: this.profiles.get(reply.decisionMakerId)?.photo ?? null,
+      jobTitle: thread.jobTitle,
+      companyName: thread.companyName,
+    };
+  }
+
+  async listWatched(sentSince: Date) {
+    return this.watched
+      .filter(({ sentAt }) => sentAt >= sentSince)
+      .map((thread) => ({
+        ...thread,
+        latestReplyMessageId:
+          this.saved.find((reply) => sameRecipient(reply, thread))?.gmailMessageId ?? null,
+      }));
+  }
+
+  async save({ applicationId, decisionMakerId }: RecipientKey, message: ReplyMessage) {
+    this.saved = [
+      ...this.saved.filter((reply) => !sameRecipient(reply, { applicationId, decisionMakerId })),
+      { ...message, applicationId, decisionMakerId, alertedAt: null },
+    ];
+  }
+
+  async listPendingAlerts() {
+    return this.saved
+      .filter(({ alertedAt }) => alertedAt === null)
+      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
+      .map((reply) => this.details(reply));
+  }
+
+  async markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date) {
+    this.saved = this.saved.map((reply) =>
+      sameRecipient(reply, recipient) && reply.gmailMessageId === gmailMessageId ? { ...reply, alertedAt: at } : reply,
+    );
+  }
+
+  async list() {
+    return [...this.saved]
+      .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime())
+      .map((reply) => this.details(reply));
+  }
+
+  async listForApplication(applicationId: number) {
+    return this.saved
+      .filter((reply) => reply.applicationId === applicationId)
+      .map(({ decisionMakerId, receivedAt }) => ({ decisionMakerId, receivedAt }));
   }
 }

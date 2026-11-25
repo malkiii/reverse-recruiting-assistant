@@ -42,11 +42,15 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* The counts, then the rates side by side. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child]:col-span-2 md:grid-cols-12 md:*:col-span-3 md:[&>*:nth-child(n+5)]:col-span-4">
         <StatTile label="Jobs found" value={totalJobs} />
         <StatTile label="Applications" value={totalApplications} />
         <StatTile label="Emails sent" value={result.emailsSent} />
+        <StatTile label="Replies" value={result.replies} href="/replies" />
         <StatTile label="Email-Found Rate" value={percent(result.emailFoundRate)} />
+        <StatTile label="Reply Rate per Decision Maker" value={percent(result.replyRatePerDecisionMaker)} />
+        <StatTile label="Reply Rate per Application" value={percent(result.replyRatePerApplication)} />
       </div>
 
       <Card className="mb-4">
@@ -84,6 +88,10 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
       <p className="mt-4 text-xs text-muted">
         Email-Found Rate: of the Applications that got past the search for Decision Makers, or ended in No Contacts or
         Direct Apply, the share that reached at least one Decision Maker with an email address.
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Reply Rates count the emails sent in the range: per Decision Maker, the share of Decision Makers emailed who
+        replied, each counted once; per Application, the share of sent Applications with at least one Reply.
       </p>
     </>
   );

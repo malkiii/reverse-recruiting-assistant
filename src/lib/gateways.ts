@@ -10,6 +10,7 @@ import type {
   jobs,
   JobSearch,
   LlmProvider,
+  replies,
   stepLogs,
 } from "./schema";
 
@@ -49,8 +50,8 @@ export interface TelegramGateway {
 
 export type DriveFile = { id: string; name: string; mimeType: string; webViewLink: string };
 
-/** The Admin's Google connection: the long-lived refresh token and the latest access token. */
-export type GoogleTokens = { refreshToken: string; accessToken: string; expiresAt: Date };
+/** The Admin's Google connection: the long-lived refresh token, the latest access token, and the scopes granted. */
+export type GoogleTokens = { refreshToken: string; accessToken: string; expiresAt: Date; scopes: string[] };
 
 export interface GoogleConnectionStore {
   get(): Promise<GoogleTokens | undefined>;
@@ -78,10 +79,27 @@ export interface DriveGateway {
 }
 
 export type Email = { to: string; subject: string; body: string };
+/** Where Gmail filed a sent email, so its thread can be checked for replies. */
+export type SentEmail = { messageId: string; threadId: string };
 
 export interface GmailGateway {
   /** Sends a plain text email from the Admin's Gmail. */
-  send(email: Email): Promise<void>;
+  send(email: Email): Promise<SentEmail>;
+}
+
+/** A message in a Gmail thread. `fromAdmin` is true for the Admin's own sent messages and drafts. */
+export type ThreadMessage = {
+  gmailMessageId: string;
+  fromName: string;
+  fromEmail: string;
+  receivedAt: Date;
+  text: string;
+  fromAdmin: boolean;
+};
+
+export interface GmailReader {
+  /** The thread's messages, oldest first. Empty when the thread no longer exists. */
+  readThread(threadId: string): Promise<ThreadMessage[]>;
 }
 
 export interface PdfReader {
@@ -91,7 +109,7 @@ export interface PdfReader {
 
 export interface GoogleOAuthGateway {
   /** Trades the OAuth callback's code for tokens. Throws unless every scope was granted along with a refresh token. */
-  exchange(code: string, redirectUri: string): Promise<GrantedTokens & { refreshToken: string }>;
+  exchange(code: string, redirectUri: string): Promise<GrantedTokens & { refreshToken: string; scopes: string[] }>;
   /** Null when Google no longer accepts the refresh token, because it was revoked or expired. */
   refresh(refreshToken: string): Promise<GrantedTokens | null>;
 }
@@ -287,8 +305,13 @@ export type EmployeesActor = ActorGateway<EmployeeSearch, Person>;
 export type EmailsActor = ActorGateway<string[], FoundEmail>;
 
 export type DecisionMaker = typeof decisionMakers.$inferSelect;
-/** A Decision Maker an Application emails, and when their email went out. */
-export type Recipient = DecisionMaker & { sentAt: Date | null };
+/**
+ * A Decision Maker an Application emails, when their email went out, and its Gmail message and thread. The Gmail IDs
+ * are null until sent, and for emails sent before they were recorded.
+ */
+export type Recipient = DecisionMaker & { sentAt: Date | null; gmailMessageId: string | null; gmailThreadId: string | null };
+/** One recipient of one Application: the Decision Maker it emails. */
+export type RecipientKey = { applicationId: number; decisionMakerId: number };
 export type FoundPerson = Pick<DecisionMaker, "name" | "headline" | "profileUrl" | "photo" | "email" | "jobFunction">;
 
 export interface DecisionMakerStore {
@@ -304,8 +327,46 @@ export interface DecisionMakerStore {
   /** Makes them the Application's Decision Makers. */
   addToApplication(applicationId: number, decisionMakerIds: number[]): Promise<void>;
   listForApplication(applicationId: number): Promise<Recipient[]>;
-  /** Records the recipient's email as sent and starts the Decision Maker's Cooldown, together. */
-  recordSent(applicationId: number, decisionMakerId: number, sentAt: Date): Promise<void>;
+  /** Records the recipient's email as sent, with its Gmail IDs, and starts the Decision Maker's Cooldown, together. */
+  recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail): Promise<void>;
+}
+
+/** A sent email's Gmail thread, watched for replies, with what a Reply Alert names and the Reply already saved. */
+export type WatchedThread = RecipientKey & {
+  gmailThreadId: string;
+  sentAt: Date;
+  decisionMakerName: string;
+  jobTitle: string;
+  companyName: string;
+  /** The saved Reply's Gmail message. Null when they haven't replied yet. */
+  latestReplyMessageId: string | null;
+};
+
+export type ReplyMessage = Pick<ThreadMessage, "gmailMessageId" | "fromName" | "fromEmail" | "receivedAt" | "text">;
+
+/** A Reply with the Decision Maker, Job and Company of the Application it replies to. */
+export type Reply = typeof replies.$inferSelect & {
+  decisionMakerName: string;
+  decisionMakerEmail: string | null;
+  decisionMakerHeadline: string;
+  decisionMakerPhoto: string | null;
+  jobTitle: string;
+  companyName: string;
+};
+
+export interface ReplyStore {
+  /** Every emailed recipient with a Gmail thread whose email went out at or after `sentSince`. */
+  listWatched(sentSince: Date): Promise<WatchedThread[]>;
+  /** Saves the recipient's latest reply, replacing an older one, as not yet alerted. */
+  save(recipient: RecipientKey, message: ReplyMessage): Promise<void>;
+  /** Replies whose Telegram alert hasn't gone out, oldest first. */
+  listPendingAlerts(): Promise<Reply[]>;
+  /** Marks the Reply alerted, unless a newer reply replaced that message meanwhile. */
+  markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date): Promise<void>;
+  /** Every Reply, the most recently received first. At most one per recipient. */
+  list(): Promise<Reply[]>;
+  /** When each Decision Maker of the Application replied. Only those who did. */
+  listForApplication(applicationId: number): Promise<{ decisionMakerId: number; receivedAt: Date }[]>;
 }
 
 export interface CompanyPageSearch {

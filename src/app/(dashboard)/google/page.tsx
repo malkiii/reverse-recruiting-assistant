@@ -34,7 +34,7 @@ export default async function GooglePage({ searchParams }: { searchParams: Promi
           <CardBody className="space-y-3">
             {connectionProblem && <Alert tone="warning">{connectionProblem}</Alert>}
             <p className="text-sm">
-              The agent sends Applications from your Gmail and reads your Resumes from one Google Drive folder.
+              The agent sends Applications from your Gmail, reads their threads for replies, and reads your Resumes from one Google Drive folder.
             </p>
             <a href="/google/connect" className={buttonClass("primary")}>
               Connect Google

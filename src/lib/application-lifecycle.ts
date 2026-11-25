@@ -623,8 +623,12 @@ export async function runSending(deps: SendDeps, applicationId: number) {
       for (const [index, recipient] of unsent.entries()) {
         if (!recipient.email) throw new Error(`${recipient.name} has no email address`);
         if (index > 0) await deps.sleep(SEND_GAP_MS);
-        await gmail.send({ to: recipient.email, subject, body: personalize(coverLetter, recipient.name, resumeLink) });
-        await deps.decisionMakers.recordSent(applicationId, recipient.id, deps.now());
+        const sent = await gmail.send({
+          to: recipient.email,
+          subject,
+          body: personalize(coverLetter, recipient.name, resumeLink),
+        });
+        await deps.decisionMakers.recordSent(applicationId, recipient.id, deps.now(), sent);
         emailed.push(describePerson(recipient));
         console.log(`Application ${applicationId}: emailed ${describePerson(recipient)}`);
       }
