@@ -735,8 +735,6 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
     eq(replies.applicationId, applicationRecipients.applicationId),
     eq(replies.decisionMakerId, applicationRecipients.decisionMakerId),
   );
-  const isReplyOf = ({ applicationId, decisionMakerId }: RecipientKey) =>
-    and(eq(replies.applicationId, applicationId), eq(replies.decisionMakerId, decisionMakerId));
 
   /** Replies with the Decision Maker, Job and Company of the Application each replies to. */
   const selectReplies = () =>
@@ -779,22 +777,10 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
     },
 
     async save({ applicationId, decisionMakerId }: RecipientKey, message: ReplyMessage) {
-      const reply = { ...message, alertedAt: null };
       await client(databaseUrl)
         .insert(replies)
-        .values({ applicationId, decisionMakerId, ...reply })
-        .onConflictDoUpdate({ target: [replies.applicationId, replies.decisionMakerId], set: reply });
-    },
-
-    listPendingAlerts() {
-      return selectReplies().where(isNull(replies.alertedAt)).orderBy(asc(replies.receivedAt));
-    },
-
-    async markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date) {
-      await client(databaseUrl)
-        .update(replies)
-        .set({ alertedAt: at })
-        .where(and(isReplyOf(recipient), eq(replies.gmailMessageId, gmailMessageId)));
+        .values({ applicationId, decisionMakerId, ...message })
+        .onConflictDoUpdate({ target: [replies.applicationId, replies.decisionMakerId], set: message });
     },
 
     list() {

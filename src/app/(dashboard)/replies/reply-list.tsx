@@ -19,7 +19,7 @@ const sentByOther = ({ fromName, fromEmail, decisionMakerName, decisionMakerEmai
 export function ReplyList({ replies, timeZone }: { replies: Reply[]; timeZone: string }) {
   if (replies.length === 0) {
     return (
-      <EmptyState title="No Replies yet">The hourly Reply Check saves them as Decision Makers reply to your emails.</EmptyState>
+      <EmptyState title="No Replies yet">Run a Reply Check to find who replied to your emails.</EmptyState>
     );
   }
 

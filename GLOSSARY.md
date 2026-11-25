@@ -42,10 +42,6 @@ _Avoid_: Notification, Prepare prompt
 The short chat message telling the Admin that a Function failed, linking to the dashboard. A Function killed by Modal can't send one.
 _Avoid_: Notification, Job Alert
 
-**Reply Alert**:
-The chat message telling the Admin about one new Reply, with its sender, Job, Company and a preview, linking to the Replies tab.
-_Avoid_: Notification, Job Alert
-
 ### Applying
 
 **Company**:
@@ -129,7 +125,7 @@ The latest message in a sent Application's Gmail thread not sent by the Admin, k
 _Avoid_: Response, answer
 
 **Reply Check**:
-The hourly check of the Gmail threads of emails sent in the last 30 days, which saves new Replies and sends a Reply Alert for each one.
+The check of the Gmail threads of emails sent in the last 30 days, which saves new Replies. The Admin runs it from the Replies tab.
 _Avoid_: Inbox sync, polling
 
 **Reply Rate per Decision Maker**:

@@ -49,10 +49,9 @@ def scheduled_collect_jobs():
     subprocess.run([*CLI, "scheduled", "collect-jobs"], cwd=APP_DIR, check=True)
 
 
-# The Reply Check reads the Gmail threads of emails sent in the last 30 days for new replies.
-@app.function(timeout=CHECK_REPLIES_TIMEOUT, schedule=modal.Cron("0 * * * *", timezone=TIMEZONE))
-def scheduled_check_replies():
-    subprocess.run([*CLI, "scheduled", "check-replies"], cwd=APP_DIR, check=True)
+@app.function(timeout=CHECK_REPLIES_TIMEOUT)
+def check_replies(run_id: int):
+    subprocess.run([*CLI, "run", "check-replies", str(run_id)], cwd=APP_DIR, check=True)
 
 
 @app.function()
@@ -88,6 +87,10 @@ def web():
     @api.post("/functions/collect-jobs")
     def start_collect_jobs(authorization: str | None = Header(default=None)):
         return accept("collect-jobs", collect_jobs, authorization)
+
+    @api.post("/functions/check-replies")
+    def start_check_replies(authorization: str | None = Header(default=None)):
+        return accept("check-replies", check_replies, authorization)
 
     @api.post("/functions/prepare-application")
     async def start_prepare_application(request: Request, authorization: str | None = Header(default=None)):

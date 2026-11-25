@@ -793,7 +793,7 @@ const sameRecipient = (a: RecipientKey, b: RecipientKey) =>
 export class FakeReplyStore implements ReplyStore {
   watched: WatchedThread[] = [];
   profiles = new Map<number, { email?: string; headline: string; photo: string | null }>();
-  private saved: (ReplyMessage & RecipientKey & { alertedAt: Date | null })[] = [];
+  private saved: (ReplyMessage & RecipientKey)[] = [];
 
   private details(reply: (typeof this.saved)[number]): Reply {
     const thread = this.watched.find((watched) => sameRecipient(watched, reply))!;
@@ -821,21 +821,8 @@ export class FakeReplyStore implements ReplyStore {
   async save({ applicationId, decisionMakerId }: RecipientKey, message: ReplyMessage) {
     this.saved = [
       ...this.saved.filter((reply) => !sameRecipient(reply, { applicationId, decisionMakerId })),
-      { ...message, applicationId, decisionMakerId, alertedAt: null },
+      { ...message, applicationId, decisionMakerId },
     ];
-  }
-
-  async listPendingAlerts() {
-    return this.saved
-      .filter(({ alertedAt }) => alertedAt === null)
-      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
-      .map((reply) => this.details(reply));
-  }
-
-  async markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date) {
-    this.saved = this.saved.map((reply) =>
-      sameRecipient(reply, recipient) && reply.gmailMessageId === gmailMessageId ? { ...reply, alertedAt: at } : reply,
-    );
   }
 
   async list() {

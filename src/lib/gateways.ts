@@ -331,7 +331,7 @@ export interface DecisionMakerStore {
   recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail): Promise<void>;
 }
 
-/** A sent email's Gmail thread, watched for replies, with what a Reply Alert names and the Reply already saved. */
+/** A sent email's Gmail thread, watched for replies, with its Decision Maker, Job and the Reply already saved. */
 export type WatchedThread = RecipientKey & {
   gmailThreadId: string;
   sentAt: Date;
@@ -357,12 +357,8 @@ export type Reply = typeof replies.$inferSelect & {
 export interface ReplyStore {
   /** Every emailed recipient with a Gmail thread whose email went out at or after `sentSince`. */
   listWatched(sentSince: Date): Promise<WatchedThread[]>;
-  /** Saves the recipient's latest reply, replacing an older one, as not yet alerted. */
+  /** Saves the recipient's latest reply, replacing an older one. */
   save(recipient: RecipientKey, message: ReplyMessage): Promise<void>;
-  /** Replies whose Telegram alert hasn't gone out, oldest first. */
-  listPendingAlerts(): Promise<Reply[]>;
-  /** Marks the Reply alerted, unless a newer reply replaced that message meanwhile. */
-  markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date): Promise<void>;
   /** Every Reply, the most recently received first. At most one per recipient. */
   list(): Promise<Reply[]>;
   /** When each Decision Maker of the Application replied. Only those who did. */
