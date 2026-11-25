@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   integer,
   jsonb,
   pgTable,
@@ -17,6 +18,7 @@ import {
 export const COLLECT_JOBS = "collect-jobs";
 export const PREPARE_APPLICATION = "prepare-application";
 export const SEND_APPLICATION = "send-application";
+export const CHECK_REPLIES = "check-replies";
 
 /** The error on a Function run that passed its time limit, as Modal killed it without a word. */
 export const PASSED_TIME_LIMIT_ERROR = "Passed its time limit";
@@ -266,6 +268,33 @@ export const applicationRecipients = pgTable(
     gmailThreadId: text("gmail_thread_id"),
   },
   (table) => [primaryKey({ columns: [table.applicationId, table.decisionMakerId] })],
+).enableRLS();
+
+/**
+ * A recipient's Reply: the latest message in their Gmail thread not sent by the Admin. A newer one replaces it, and
+ * `alertedAt` stays null until its Telegram alert goes out. Deleted with its recipient.
+ */
+export const replies = pgTable(
+  "replies",
+  {
+    applicationId: bigint("application_id", { mode: "number" }).notNull(),
+    decisionMakerId: bigint("decision_maker_id", { mode: "number" }).notNull(),
+    /** The latest reply's Gmail message, so it isn't saved or alerted twice. */
+    gmailMessageId: text("gmail_message_id").notNull(),
+    fromName: text("from_name").notNull(),
+    fromEmail: text("from_email").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    text: text().notNull(),
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationId, table.decisionMakerId] }),
+    foreignKey({
+      name: "replies_recipient_fk",
+      columns: [table.applicationId, table.decisionMakerId],
+      foreignColumns: [applicationRecipients.applicationId, applicationRecipients.decisionMakerId],
+    }).onDelete("cascade"),
+  ],
 ).enableRLS();
 
 /** One attempt at one Application step, shown on the dashboard. */

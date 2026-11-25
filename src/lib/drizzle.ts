@@ -6,6 +6,7 @@ import {
   eq,
   getTableColumns,
   gt,
+  gte,
   ilike,
   inArray,
   isNotNull,
@@ -54,6 +55,8 @@ import type {
   JobFeed,
   JobFeedStore,
   JobStore,
+  ReplyMessage,
+  ReplyStore,
   ResumeFolderStore,
   SentEmail,
   SkippedApifyTokenStore,
@@ -73,6 +76,7 @@ import {
   llmApiKeys,
   type LlmProvider,
   PASSED_TIME_LIMIT_ERROR,
+  replies,
   RETRIED_AFTER_TIME_LIMIT_ERROR,
   settings,
   skippedApifyTokens,
@@ -721,6 +725,76 @@ export function drizzleDecisionMakerStore(databaseUrl: string): DecisionMakerSto
           );
         await tx.update(decisionMakers).set({ lastEmailedAt: sentAt }).where(eq(decisionMakers.id, decisionMakerId));
       });
+    },
+  };
+}
+
+export function drizzleReplyStore(databaseUrl: string): ReplyStore {
+  const isRecipient = and(
+    eq(replies.applicationId, applicationRecipients.applicationId),
+    eq(replies.decisionMakerId, applicationRecipients.decisionMakerId),
+  );
+  const isReplyOf = (applicationId: number, decisionMakerId: number) =>
+    and(eq(replies.applicationId, applicationId), eq(replies.decisionMakerId, decisionMakerId));
+
+  /** Replies with the Decision Maker, Job and Company of the Application each answers. */
+  const selectReplies = () =>
+    client(databaseUrl)
+      .select({
+        ...getTableColumns(replies),
+        decisionMakerName: decisionMakers.name,
+        jobTitle: jobs.title,
+        companyName: jobs.companyName,
+      })
+      .from(replies)
+      .innerJoin(decisionMakers, eq(decisionMakers.id, replies.decisionMakerId))
+      .innerJoin(applications, eq(applications.id, replies.applicationId))
+      .innerJoin(jobs, eq(jobs.id, applications.jobId));
+
+  return {
+    async listWatched(sentSince: Date) {
+      const rows = await client(databaseUrl)
+        .select({
+          applicationId: applicationRecipients.applicationId,
+          decisionMakerId: applicationRecipients.decisionMakerId,
+          gmailThreadId: applicationRecipients.gmailThreadId,
+          sentAt: applicationRecipients.sentAt,
+          decisionMakerName: decisionMakers.name,
+          jobTitle: jobs.title,
+          companyName: jobs.companyName,
+          latestReplyMessageId: replies.gmailMessageId,
+        })
+        .from(applicationRecipients)
+        .innerJoin(decisionMakers, eq(decisionMakers.id, applicationRecipients.decisionMakerId))
+        .innerJoin(applications, eq(applications.id, applicationRecipients.applicationId))
+        .innerJoin(jobs, eq(jobs.id, applications.jobId))
+        .leftJoin(replies, isRecipient)
+        .where(and(isNotNull(applicationRecipients.gmailThreadId), gte(applicationRecipients.sentAt, sentSince)))
+        .orderBy(asc(applicationRecipients.sentAt));
+      return rows.map((row) => ({ ...row, gmailThreadId: row.gmailThreadId!, sentAt: row.sentAt! }));
+    },
+
+    async save(applicationId: number, decisionMakerId: number, message: ReplyMessage) {
+      const reply = { ...message, alertedAt: null };
+      await client(databaseUrl)
+        .insert(replies)
+        .values({ applicationId, decisionMakerId, ...reply })
+        .onConflictDoUpdate({ target: [replies.applicationId, replies.decisionMakerId], set: reply });
+    },
+
+    listPendingAlerts() {
+      return selectReplies().where(isNull(replies.alertedAt)).orderBy(asc(replies.receivedAt));
+    },
+
+    async markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date) {
+      await client(databaseUrl)
+        .update(replies)
+        .set({ alertedAt: at })
+        .where(and(isReplyOf(applicationId, decisionMakerId), eq(replies.gmailMessageId, gmailMessageId)));
+    },
+
+    list() {
+      return selectReplies().orderBy(desc(replies.receivedAt));
     },
   };
 }

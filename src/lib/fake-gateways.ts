@@ -57,6 +57,12 @@ import type {
   JobFeedStore,
   JobStore,
   PlaceholderName,
+  GmailReader,
+  Reply,
+  ReplyMessage,
+  ReplyStore,
+  ThreadMessage,
+  WatchedThread,
   SkippedApifyTokenStore,
   TelegramGateway,
   TelegramLink,
@@ -760,5 +766,78 @@ export class FakeGmail implements GmailGateway {
     this.sent.push(email);
     this.onSend(email);
     return { messageId: `message-${this.sent.length}`, threadId: `thread-${this.sent.length}` };
+  }
+}
+
+/** Serves the threads set here by ID, and throws for the ones in `failing`. Records each thread read. */
+export class FakeGmailReader implements GmailReader {
+  threads = new Map<string, ThreadMessage[]>();
+  failing = new Set<string>();
+  read: string[] = [];
+
+  async readThread(threadId: string) {
+    this.read.push(threadId);
+    if (this.failing.has(threadId)) throw new Error(`Gmail refused to read ${threadId}`);
+    return this.threads.get(threadId) ?? [];
+  }
+}
+
+/** Watches the threads set in `watched`, and joins each saved Reply to its watched thread's Job and Decision Maker. */
+export class FakeReplyStore implements ReplyStore {
+  watched: WatchedThread[] = [];
+  private saved: (ReplyMessage & { applicationId: number; decisionMakerId: number; alertedAt: Date | null })[] = [];
+
+  private details(reply: (typeof this.saved)[number]): Reply {
+    const thread = this.watched.find(
+      (watched) => watched.applicationId === reply.applicationId && watched.decisionMakerId === reply.decisionMakerId,
+    )!;
+    return {
+      ...reply,
+      decisionMakerName: thread.decisionMakerName,
+      jobTitle: thread.jobTitle,
+      companyName: thread.companyName,
+    };
+  }
+
+  async listWatched(sentSince: Date) {
+    return this.watched
+      .filter(({ sentAt }) => sentAt >= sentSince)
+      .map((thread) => ({
+        ...thread,
+        latestReplyMessageId:
+          this.saved.find(
+            (reply) => reply.applicationId === thread.applicationId && reply.decisionMakerId === thread.decisionMakerId,
+          )?.gmailMessageId ?? null,
+      }));
+  }
+
+  async save(applicationId: number, decisionMakerId: number, message: ReplyMessage) {
+    this.saved = [
+      ...this.saved.filter((reply) => reply.applicationId !== applicationId || reply.decisionMakerId !== decisionMakerId),
+      { ...message, applicationId, decisionMakerId, alertedAt: null },
+    ];
+  }
+
+  async listPendingAlerts() {
+    return this.saved
+      .filter(({ alertedAt }) => alertedAt === null)
+      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
+      .map((reply) => this.details(reply));
+  }
+
+  async markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date) {
+    this.saved = this.saved.map((reply) =>
+      reply.applicationId === applicationId &&
+      reply.decisionMakerId === decisionMakerId &&
+      reply.gmailMessageId === gmailMessageId
+        ? { ...reply, alertedAt: at }
+        : reply,
+    );
+  }
+
+  async list() {
+    return [...this.saved]
+      .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime())
+      .map((reply) => this.details(reply));
   }
 }

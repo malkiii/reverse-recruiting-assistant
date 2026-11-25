@@ -10,6 +10,7 @@ import type {
   jobs,
   JobSearch,
   LlmProvider,
+  replies,
   stepLogs,
 } from "./schema";
 
@@ -84,6 +85,21 @@ export type SentEmail = { messageId: string; threadId: string };
 export interface GmailGateway {
   /** Sends a plain text email from the Admin's Gmail. */
   send(email: Email): Promise<SentEmail>;
+}
+
+/** A message in a Gmail thread. `fromAdmin` is true for the Admin's own sent messages and drafts. */
+export type ThreadMessage = {
+  gmailMessageId: string;
+  fromName: string;
+  fromEmail: string;
+  receivedAt: Date;
+  text: string;
+  fromAdmin: boolean;
+};
+
+export interface GmailReader {
+  /** The thread's messages, oldest first. Empty when the thread no longer exists. */
+  readThread(threadId: string): Promise<ThreadMessage[]>;
 }
 
 export interface PdfReader {
@@ -311,6 +327,41 @@ export interface DecisionMakerStore {
   listForApplication(applicationId: number): Promise<Recipient[]>;
   /** Records the recipient's email as sent, with its Gmail IDs, and starts the Decision Maker's Cooldown, together. */
   recordSent(applicationId: number, decisionMakerId: number, sentAt: Date, email: SentEmail): Promise<void>;
+}
+
+/** A sent email's Gmail thread, watched for replies, with what a Reply Alert names and the Reply already saved. */
+export type WatchedThread = {
+  applicationId: number;
+  decisionMakerId: number;
+  gmailThreadId: string;
+  sentAt: Date;
+  decisionMakerName: string;
+  jobTitle: string;
+  companyName: string;
+  /** The saved Reply's Gmail message. Null when they haven't replied yet. */
+  latestReplyMessageId: string | null;
+};
+
+export type ReplyMessage = Pick<ThreadMessage, "gmailMessageId" | "fromName" | "fromEmail" | "receivedAt" | "text">;
+
+/** A Reply with the Decision Maker, Job and Company of the Application it answers. */
+export type Reply = typeof replies.$inferSelect & {
+  decisionMakerName: string;
+  jobTitle: string;
+  companyName: string;
+};
+
+export interface ReplyStore {
+  /** Every emailed recipient with a Gmail thread whose email went out at or after `sentSince`. */
+  listWatched(sentSince: Date): Promise<WatchedThread[]>;
+  /** Saves the recipient's latest reply, replacing an older one, as not yet alerted. */
+  save(applicationId: number, decisionMakerId: number, message: ReplyMessage): Promise<void>;
+  /** Replies whose Telegram alert hasn't gone out, oldest first. */
+  listPendingAlerts(): Promise<Reply[]>;
+  /** Marks the Reply alerted, unless a newer reply replaced that message meanwhile. */
+  markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date): Promise<void>;
+  /** Every Reply, the most recently received first. At most one per recipient. */
+  list(): Promise<Reply[]>;
 }
 
 export interface CompanyPageSearch {

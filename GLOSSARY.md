@@ -120,6 +120,14 @@ _Avoid_: Template, message
 The 30 days after a Decision Maker is emailed, during which they cannot be emailed again.
 _Avoid_: Blocklist
 
+**Reply**:
+A Decision Maker's answer to a sent Application: the latest message in its Gmail thread not sent by the Admin. A newer message replaces it.
+_Avoid_: Response, answer
+
+**Reply Check**:
+The hourly check of the Gmail threads of emails sent in the last 30 days, which saves new Replies and alerts the Admin of each one.
+_Avoid_: Inbox sync, polling
+
 **People Refresh**:
 The search for a Company's Decision Makers again, required once its saved people are 6 months old.
 _Avoid_: Re-scrape
