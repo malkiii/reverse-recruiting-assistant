@@ -1,4 +1,4 @@
-import type { ApplicationStatus, ApplicationStep } from "./gateways";
+import type { ApplicationStatus, ApplicationStep, RecipientKey } from "./gateways";
 import { APPLICATION_STEPS } from "./schema";
 
 export type StatsRange = "24h" | "7d" | "30d" | "all";
@@ -6,10 +6,10 @@ export type StatsRange = "24h" | "7d" | "30d" | "all";
 export type StatsRows = {
   jobs: { source: string; foundAt: Date }[];
   applications: { status: ApplicationStatus; currentStep: ApplicationStep; createdAt: Date }[];
-  /** Each Recipient emailed, and when the email went out. */
-  sent: { applicationId: number; decisionMakerId: number; sentAt: Date }[];
-  /** At most one per Recipient. */
-  replies: { applicationId: number; decisionMakerId: number; receivedAt: Date }[];
+  /** Each recipient emailed, and when the email went out. */
+  sent: (RecipientKey & { sentAt: Date })[];
+  /** At most one per recipient. */
+  replies: (RecipientKey & { receivedAt: Date })[];
 };
 
 export type Stats = {
@@ -44,23 +44,26 @@ function emailFoundRate(applications: StatsApplication[]) {
   return searched.filter(({ status }) => !NOBODY_TO_EMAIL.includes(status)).length / searched.length;
 }
 
-type Recipient = { applicationId: number; decisionMakerId: number };
-const recipientKey = ({ applicationId, decisionMakerId }: Recipient) => `${applicationId}-${decisionMakerId}`;
+const recipientId = ({ applicationId, decisionMakerId }: RecipientKey) => `${applicationId}-${decisionMakerId}`;
 
-/** Of the Recipients emailed, the share who replied. */
-function replyRatePerDecisionMaker(sent: Recipient[], replies: Recipient[]) {
-  if (sent.length === 0) return null;
-  const replied = new Set(replies.map(recipientKey));
-  return sent.filter((recipient) => replied.has(recipientKey(recipient))).length / sent.length;
+/** The recipients emailed who replied, by the Application they replied to. */
+function repliedRecipients(sent: RecipientKey[], replies: RecipientKey[]) {
+  const replied = new Set(replies.map(recipientId));
+  return sent.filter((recipient) => replied.has(recipientId(recipient)));
+}
+
+/** Of the Decision Makers emailed, the share who replied, each counted once. */
+function replyRatePerDecisionMaker(sent: RecipientKey[], replies: RecipientKey[]) {
+  const emailed = new Set(sent.map(({ decisionMakerId }) => decisionMakerId));
+  if (emailed.size === 0) return null;
+  return new Set(repliedRecipients(sent, replies).map(({ decisionMakerId }) => decisionMakerId)).size / emailed.size;
 }
 
 /** Of the Applications emailed, the share with at least one reply. */
-function replyRatePerApplication(sent: Recipient[], replies: Recipient[]) {
+function replyRatePerApplication(sent: RecipientKey[], replies: RecipientKey[]) {
   const emailed = new Set(sent.map(({ applicationId }) => applicationId));
   if (emailed.size === 0) return null;
-  const replied = new Set(replies.map(recipientKey));
-  const answered = new Set(sent.filter((recipient) => replied.has(recipientKey(recipient))).map(({ applicationId }) => applicationId));
-  return answered.size / emailed.size;
+  return new Set(repliedRecipients(sent, replies).map(({ applicationId }) => applicationId)).size / emailed.size;
 }
 
 const HOUR_MS = 60 * 60 * 1000;

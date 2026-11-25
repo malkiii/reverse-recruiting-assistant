@@ -310,6 +310,8 @@ export type DecisionMaker = typeof decisionMakers.$inferSelect;
  * are null until sent, and for emails sent before they were recorded.
  */
 export type Recipient = DecisionMaker & { sentAt: Date | null; gmailMessageId: string | null; gmailThreadId: string | null };
+/** One recipient of one Application: the Decision Maker it emails. */
+export type RecipientKey = { applicationId: number; decisionMakerId: number };
 export type FoundPerson = Pick<DecisionMaker, "name" | "headline" | "profileUrl" | "photo" | "email" | "jobFunction">;
 
 export interface DecisionMakerStore {
@@ -330,9 +332,7 @@ export interface DecisionMakerStore {
 }
 
 /** A sent email's Gmail thread, watched for replies, with what a Reply Alert names and the Reply already saved. */
-export type WatchedThread = {
-  applicationId: number;
-  decisionMakerId: number;
+export type WatchedThread = RecipientKey & {
   gmailThreadId: string;
   sentAt: Date;
   decisionMakerName: string;
@@ -344,9 +344,10 @@ export type WatchedThread = {
 
 export type ReplyMessage = Pick<ThreadMessage, "gmailMessageId" | "fromName" | "fromEmail" | "receivedAt" | "text">;
 
-/** A Reply with the Decision Maker, Job and Company of the Application it answers. */
+/** A Reply with the Decision Maker, Job and Company of the Application it replies to. */
 export type Reply = typeof replies.$inferSelect & {
   decisionMakerName: string;
+  decisionMakerEmail: string | null;
   decisionMakerHeadline: string;
   decisionMakerPhoto: string | null;
   jobTitle: string;
@@ -357,11 +358,11 @@ export interface ReplyStore {
   /** Every emailed recipient with a Gmail thread whose email went out at or after `sentSince`. */
   listWatched(sentSince: Date): Promise<WatchedThread[]>;
   /** Saves the recipient's latest reply, replacing an older one, as not yet alerted. */
-  save(applicationId: number, decisionMakerId: number, message: ReplyMessage): Promise<void>;
+  save(recipient: RecipientKey, message: ReplyMessage): Promise<void>;
   /** Replies whose Telegram alert hasn't gone out, oldest first. */
   listPendingAlerts(): Promise<Reply[]>;
   /** Marks the Reply alerted, unless a newer reply replaced that message meanwhile. */
-  markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date): Promise<void>;
+  markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date): Promise<void>;
   /** Every Reply, the most recently received first. At most one per recipient. */
   list(): Promise<Reply[]>;
   /** When each Decision Maker of the Application replied. Only those who did. */

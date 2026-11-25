@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { FakeGmailReader, FakeReplyStore, FakeTelegram } from "./fake-gateways";
 import type { ThreadMessage, WatchedThread } from "./gateways";
+import { GoogleConnectionError } from "./google-connection";
 import { runReplyCheck } from "./reply-check";
 
 const now = new Date("2026-11-25T12:00:00Z");
@@ -178,4 +179,28 @@ test("with no thread to check, Google isn't asked for access", async () => {
   await runReplyCheck(deps);
 
   expect(deps.telegram.sent).toEqual([]);
+});
+
+test("when Google needs reconnecting, the run ends without error and still sends pending Reply Alerts", async () => {
+  const deps = setup();
+  deps.gmail.threads.set("thread-1", [adminMessage, reply()]);
+  deps.telegram.failing = true;
+  await expect(runReplyCheck(deps)).rejects.toThrow("Telegram is down");
+
+  deps.telegram.failing = false;
+  deps.gmailReader = async () => {
+    throw new GoogleConnectionError("The agent needs more Google access: reconnect Google on the dashboard's Google page");
+  };
+  await runReplyCheck(deps);
+
+  expect(deps.telegram.sent).toHaveLength(1);
+});
+
+test("any other error getting Gmail access fails the run", async () => {
+  const deps = setup();
+  deps.gmailReader = async () => {
+    throw new Error("Google is down");
+  };
+
+  await expect(runReplyCheck(deps)).rejects.toThrow("Google is down");
 });

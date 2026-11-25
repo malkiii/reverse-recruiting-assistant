@@ -37,6 +37,7 @@ import { GoogleConnectionError } from "@/lib/google-connection";
 import { resumesIn } from "@/lib/resumes";
 import { PREPARE_APPLICATION, SEND_APPLICATION, WORKING_STATUSES } from "@/lib/schema";
 import { CopyButton } from "@/components/copy-button";
+import { replyAnchor } from "../../replies/reply-list";
 import { CoverLetterCard } from "./cover-letter-card";
 
 const applicationPath = (applicationId: number) => `/applications/${applicationId}`;
@@ -297,7 +298,7 @@ function ReplyStatus({
 }) {
   if (!repliedAt) return <Tag>No reply yet</Tag>;
   return (
-    <Link href={`/replies#reply-${applicationId}-${decisionMakerId}`} className="hover:underline">
+    <Link href={`/replies#${replyAnchor({ applicationId, decisionMakerId })}`} className="hover:underline">
       <Tag tone="emerald">Replied {dateTime(repliedAt, timeZone)}</Tag>
     </Link>
   );

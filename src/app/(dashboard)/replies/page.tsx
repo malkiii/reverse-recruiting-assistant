@@ -12,7 +12,7 @@ export default async function RepliesPage() {
 
   return (
     <>
-      <PageHeader title="Replies" subtitle="Who answered your emails, with their latest message, the most recent first" />
+      <PageHeader title="Replies" subtitle="Who replied to your emails, with their latest message, the most recent first" />
       <ReplyList replies={replies} timeZone={TIMEZONE} />
     </>
   );

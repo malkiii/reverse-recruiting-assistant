@@ -55,6 +55,7 @@ import type {
   JobFeed,
   JobFeedStore,
   JobStore,
+  RecipientKey,
   ReplyMessage,
   ReplyStore,
   ResumeFolderStore,
@@ -734,15 +735,16 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
     eq(replies.applicationId, applicationRecipients.applicationId),
     eq(replies.decisionMakerId, applicationRecipients.decisionMakerId),
   );
-  const isReplyOf = (applicationId: number, decisionMakerId: number) =>
+  const isReplyOf = ({ applicationId, decisionMakerId }: RecipientKey) =>
     and(eq(replies.applicationId, applicationId), eq(replies.decisionMakerId, decisionMakerId));
 
-  /** Replies with the Decision Maker, Job and Company of the Application each answers. */
+  /** Replies with the Decision Maker, Job and Company of the Application each replies to. */
   const selectReplies = () =>
     client(databaseUrl)
       .select({
         ...getTableColumns(replies),
         decisionMakerName: decisionMakers.name,
+        decisionMakerEmail: decisionMakers.email,
         decisionMakerHeadline: decisionMakers.headline,
         decisionMakerPhoto: decisionMakers.photo,
         jobTitle: jobs.title,
@@ -776,7 +778,7 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
       return rows.map((row) => ({ ...row, gmailThreadId: row.gmailThreadId!, sentAt: row.sentAt! }));
     },
 
-    async save(applicationId: number, decisionMakerId: number, message: ReplyMessage) {
+    async save({ applicationId, decisionMakerId }: RecipientKey, message: ReplyMessage) {
       const reply = { ...message, alertedAt: null };
       await client(databaseUrl)
         .insert(replies)
@@ -788,11 +790,11 @@ export function drizzleReplyStore(databaseUrl: string): ReplyStore {
       return selectReplies().where(isNull(replies.alertedAt)).orderBy(asc(replies.receivedAt));
     },
 
-    async markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date) {
+    async markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date) {
       await client(databaseUrl)
         .update(replies)
         .set({ alertedAt: at })
-        .where(and(isReplyOf(applicationId, decisionMakerId), eq(replies.gmailMessageId, gmailMessageId)));
+        .where(and(isReplyOf(recipient), eq(replies.gmailMessageId, gmailMessageId)));
     },
 
     list() {

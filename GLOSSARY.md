@@ -42,6 +42,10 @@ _Avoid_: Notification, Prepare prompt
 The short chat message telling the Admin that a Function failed, linking to the dashboard. A Function killed by Modal can't send one.
 _Avoid_: Notification, Job Alert
 
+**Reply Alert**:
+The chat message telling the Admin about one new Reply, with its sender, Job, Company and a preview, linking to the Replies tab.
+_Avoid_: Notification, Job Alert
+
 ### Applying
 
 **Company**:
@@ -121,15 +125,15 @@ The 30 days after a Decision Maker is emailed, during which they cannot be email
 _Avoid_: Blocklist
 
 **Reply**:
-A Decision Maker's answer to a sent Application: the latest message in its Gmail thread not sent by the Admin. A newer message replaces it.
+The latest message in a sent Application's Gmail thread not sent by the Admin, kept once per Decision Maker emailed. It may come from someone other than the Decision Maker. A newer message replaces it.
 _Avoid_: Response, answer
 
 **Reply Check**:
-The hourly check of the Gmail threads of emails sent in the last 30 days, which saves new Replies and alerts the Admin of each one.
+The hourly check of the Gmail threads of emails sent in the last 30 days, which saves new Replies and sends a Reply Alert for each one.
 _Avoid_: Inbox sync, polling
 
 **Reply Rate per Decision Maker**:
-Of the Decision Makers emailed, the share who sent a Reply. Each Application a Decision Maker was emailed for counts once.
+Of the Decision Makers emailed, the share who sent a Reply. Each Decision Maker counts once, however many Applications emailed them.
 _Avoid_: Response rate
 
 **Reply Rate per Application**:

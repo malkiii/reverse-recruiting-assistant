@@ -1,4 +1,5 @@
-import type { GmailReader, Reply, ReplyStore, TelegramGateway } from "./gateways";
+import type { GmailReader, Reply, ReplyStore, TelegramGateway, WatchedThread } from "./gateways";
+import { GoogleConnectionError } from "./google-connection";
 import { escapeHtml } from "./telegram";
 
 export const REPLY_CHECK_TIME_LIMIT_MS = 10 * 60_000;
@@ -35,7 +36,8 @@ const replyAlert = ({ fromName, fromEmail, jobTitle, companyName, text }: Reply)
 /**
  * The Reply Check: reads the Gmail thread of every email sent in the last 30 days, saves each recipient's latest reply,
  * then alerts the Admin of each new one. A failed thread or alert doesn't stop the others; it fails the run once all are
- * done, and an unsent alert is retried on the next run.
+ * done, and an unsent alert is retried on the next run. When Google needs reconnecting, no thread is read but the run
+ * doesn't fail, so it doesn't raise a Failure Alert every hour until the Admin reconnects.
  */
 export async function runReplyCheck(deps: ReplyCheckDeps) {
   const { replies, now } = deps;
@@ -43,21 +45,11 @@ export async function runReplyCheck(deps: ReplyCheckDeps) {
   const watched = await replies.listWatched(new Date(now().getTime() - REPLY_WATCH_DAYS * DAY_MS));
   console.log(`Checking ${watched.length} Gmail thread(s) for replies`);
 
-  if (watched.length > 0) {
-    const gmail = await deps.gmailReader();
+  const gmail = watched.length > 0 ? await gmailReaderUnlessDisconnected(deps) : undefined;
+  if (gmail) {
     for (const thread of watched) {
       try {
-        const messages = await gmail.readThread(thread.gmailThreadId);
-        const latest = messages
-          .filter(({ fromAdmin }) => !fromAdmin)
-          .reduce<(typeof messages)[number] | undefined>(
-            (newest, message) => (!newest || message.receivedAt > newest.receivedAt ? message : newest),
-            undefined,
-          );
-        if (!latest || latest.gmailMessageId === thread.latestReplyMessageId) continue;
-        const { fromAdmin: _fromAdmin, ...reply } = latest;
-        await replies.save(thread.applicationId, thread.decisionMakerId, reply);
-        console.log(`Application ${thread.applicationId}: new reply from ${reply.fromEmail}`);
+        await checkThread(gmail, replies, thread);
       } catch (error) {
         console.error(`Gmail thread ${thread.gmailThreadId}: failed:`, error);
         errors.push(`Gmail thread ${thread.gmailThreadId}: ${message(error)}`);
@@ -69,6 +61,27 @@ export async function runReplyCheck(deps: ReplyCheckDeps) {
 
   console.log(`Reply Check finished with ${errors.length} error(s)`);
   if (errors.length > 0) throw new Error(errors.join("; "));
+}
+
+/** Undefined when Google needs reconnecting, such as for a missing scope. */
+async function gmailReaderUnlessDisconnected(deps: ReplyCheckDeps) {
+  try {
+    return await deps.gmailReader();
+  } catch (error) {
+    if (!(error instanceof GoogleConnectionError)) throw error;
+    console.warn(`Skipping the Gmail threads, Google needs reconnecting: ${error.message}`);
+    return undefined;
+  }
+}
+
+/** Saves the thread's latest message not sent by the Admin, unless it is already the saved Reply. */
+async function checkThread(gmail: GmailReader, replies: ReplyStore, thread: WatchedThread) {
+  // Oldest first, so the last one is the latest.
+  const latest = (await gmail.readThread(thread.gmailThreadId)).filter(({ fromAdmin }) => !fromAdmin).at(-1);
+  if (!latest || latest.gmailMessageId === thread.latestReplyMessageId) return;
+  const { fromAdmin: _fromAdmin, ...reply } = latest;
+  await replies.save(thread, reply);
+  console.log(`Application ${thread.applicationId}: new reply from ${reply.fromEmail}`);
 }
 
 async function sendReplyAlerts({ replies, telegram, dashboardUrl, now }: ReplyCheckDeps, errors: string[]) {
@@ -83,6 +96,6 @@ async function sendReplyAlerts({ replies, telegram, dashboardUrl, now }: ReplyCh
       errors.push(`Reply Alert for ${reply.fromEmail}: ${message(error)}`);
       continue;
     }
-    await replies.markAlerted(reply.applicationId, reply.decisionMakerId, reply.gmailMessageId, now());
+    await replies.markAlerted(reply, reply.gmailMessageId, now());
   }
 }

@@ -13,6 +13,7 @@ const reply = (overrides: Partial<Reply> = {}): Reply => ({
   text: "Thanks, let's talk on Monday.",
   alertedAt: null,
   decisionMakerName: "Jane Doe",
+  decisionMakerEmail: "jane@acme.com",
   decisionMakerHeadline: "CTO at Acme",
   decisionMakerPhoto: null,
   jobTitle: "Backend Engineer",
@@ -33,6 +34,27 @@ test("each Reply shows its sender, Job, Company and latest message, linked to it
   expect(html).toContain("Acme");
   expect(html).toContain("Thanks, let&#x27;s talk on Monday.");
   expect(html).toContain("Nov 24");
+  expect(html).not.toContain("Replied by");
+});
+
+test("a Reply sent by someone other than the Decision Maker shows both", () => {
+  const html = render([reply({ fromName: "Sam Assistant", fromEmail: "sam@acme.com" })]);
+
+  expect(html).toContain("Jane Doe");
+  expect(html).toContain("Replied by Sam Assistant (sam@acme.com)");
+});
+
+test("a Reply from another address of the Decision Maker shows the sender", () => {
+  const html = render([reply({ fromEmail: "jane.doe@gmail.com" })]);
+
+  expect(html).toContain("Replied by Jane Doe (jane.doe@gmail.com)");
+});
+
+test("a Reply sent with no name still shows the Decision Maker's", () => {
+  const html = render([reply({ fromName: "" })]);
+
+  expect(html).toContain("Jane Doe");
+  expect(html).not.toContain("Replied by");
 });
 
 test("each Reply can be linked to by its Application and Decision Maker", () => {

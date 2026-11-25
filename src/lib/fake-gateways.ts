@@ -58,6 +58,7 @@ import type {
   JobStore,
   PlaceholderName,
   GmailReader,
+  RecipientKey,
   Reply,
   ReplyMessage,
   ReplyStore,
@@ -782,22 +783,24 @@ export class FakeGmailReader implements GmailReader {
   }
 }
 
+const sameRecipient = (a: RecipientKey, b: RecipientKey) =>
+  a.applicationId === b.applicationId && a.decisionMakerId === b.decisionMakerId;
+
 /**
  * Watches the threads set in `watched`, and joins each saved Reply to its watched thread's Job and Decision Maker,
- * with the Decision Maker's headline and photo when set in `profiles`.
+ * with the Decision Maker's email, headline and photo when set in `profiles`.
  */
 export class FakeReplyStore implements ReplyStore {
   watched: WatchedThread[] = [];
-  profiles = new Map<number, { headline: string; photo: string | null }>();
-  private saved: (ReplyMessage & { applicationId: number; decisionMakerId: number; alertedAt: Date | null })[] = [];
+  profiles = new Map<number, { email?: string; headline: string; photo: string | null }>();
+  private saved: (ReplyMessage & RecipientKey & { alertedAt: Date | null })[] = [];
 
   private details(reply: (typeof this.saved)[number]): Reply {
-    const thread = this.watched.find(
-      (watched) => watched.applicationId === reply.applicationId && watched.decisionMakerId === reply.decisionMakerId,
-    )!;
+    const thread = this.watched.find((watched) => sameRecipient(watched, reply))!;
     return {
       ...reply,
       decisionMakerName: thread.decisionMakerName,
+      decisionMakerEmail: this.profiles.get(reply.decisionMakerId)?.email ?? null,
       decisionMakerHeadline: this.profiles.get(reply.decisionMakerId)?.headline ?? "",
       decisionMakerPhoto: this.profiles.get(reply.decisionMakerId)?.photo ?? null,
       jobTitle: thread.jobTitle,
@@ -811,15 +814,13 @@ export class FakeReplyStore implements ReplyStore {
       .map((thread) => ({
         ...thread,
         latestReplyMessageId:
-          this.saved.find(
-            (reply) => reply.applicationId === thread.applicationId && reply.decisionMakerId === thread.decisionMakerId,
-          )?.gmailMessageId ?? null,
+          this.saved.find((reply) => sameRecipient(reply, thread))?.gmailMessageId ?? null,
       }));
   }
 
-  async save(applicationId: number, decisionMakerId: number, message: ReplyMessage) {
+  async save({ applicationId, decisionMakerId }: RecipientKey, message: ReplyMessage) {
     this.saved = [
-      ...this.saved.filter((reply) => reply.applicationId !== applicationId || reply.decisionMakerId !== decisionMakerId),
+      ...this.saved.filter((reply) => !sameRecipient(reply, { applicationId, decisionMakerId })),
       { ...message, applicationId, decisionMakerId, alertedAt: null },
     ];
   }
@@ -831,13 +832,9 @@ export class FakeReplyStore implements ReplyStore {
       .map((reply) => this.details(reply));
   }
 
-  async markAlerted(applicationId: number, decisionMakerId: number, gmailMessageId: string, at: Date) {
+  async markAlerted(recipient: RecipientKey, gmailMessageId: string, at: Date) {
     this.saved = this.saved.map((reply) =>
-      reply.applicationId === applicationId &&
-      reply.decisionMakerId === decisionMakerId &&
-      reply.gmailMessageId === gmailMessageId
-        ? { ...reply, alertedAt: at }
-        : reply,
+      sameRecipient(reply, recipient) && reply.gmailMessageId === gmailMessageId ? { ...reply, alertedAt: at } : reply,
     );
   }
 

@@ -9,7 +9,7 @@ const rows = (overrides: Partial<StatsRows>): StatsRows => ({ jobs: [], applicat
 /** Emails sent at these times, each to a different Decision Maker of Application 1. */
 const emailsAt = (...dates: Date[]) => dates.map((sentAt, index) => ({ applicationId: 1, decisionMakerId: index + 1, sentAt }));
 
-test("Reply rate per Decision Maker is the share of Decision Makers emailed in the range who replied", () => {
+test("Reply Rate per Decision Maker is the share of Decision Makers emailed in the range who replied", () => {
   const result = stats(
     rows({
       sent: [
@@ -33,7 +33,26 @@ test("Reply rate per Decision Maker is the share of Decision Makers emailed in t
   expect(result.replyRatePerDecisionMaker).toBe(2 / 4);
 });
 
-test("Reply rate per Application is the share of Applications emailed in the range with at least one reply", () => {
+test("Reply Rate per Decision Maker counts each Decision Maker once, however many Applications emailed them", () => {
+  const result = stats(
+    rows({
+      sent: [
+        // Emailed for two Applications, replied to one.
+        { applicationId: 1, decisionMakerId: 1, sentAt: daysAgo(1) },
+        { applicationId: 2, decisionMakerId: 1, sentAt: daysAgo(2) },
+        // No reply.
+        { applicationId: 3, decisionMakerId: 2, sentAt: daysAgo(3) },
+      ],
+      replies: [{ applicationId: 1, decisionMakerId: 1, receivedAt: hoursAgo(1) }],
+    }),
+    "7d",
+    now,
+  );
+
+  expect(result.replyRatePerDecisionMaker).toBe(1 / 2);
+});
+
+test("Reply Rate per Application is the share of Applications emailed in the range with at least one reply", () => {
   const result = stats(
     rows({
       sent: [
