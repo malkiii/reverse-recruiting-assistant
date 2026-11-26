@@ -90,6 +90,12 @@ const TABS = [
       </>,
     ),
   },
+  // TEMPORARY: the Test Email page, for checking email tracking. Remove with it.
+  {
+    href: "/test-email",
+    label: "Test Email",
+    icon: icon(<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />),
+  },
 ];
 
 /** Google lives under Settings, and Function runs moved to Activity. */
