@@ -203,16 +203,59 @@ function sender(from: string) {
   return { fromName: match[1].trim() || fromEmail, fromEmail };
 }
 
-/** A Gmail API message, in the full format, as a thread message. Its plain text body is preferred over its HTML. */
+/** The HTML without the quoted earlier messages that mail clients put at its end. */
+const htmlWithoutQuote = (html: string) =>
+  html.replace(/<(div|blockquote)\b[^>]*\b(class="[^"]*gmail_quote|id="(divRplyFwdMsg|appendonsend)")[\s\S]*$/i, "");
+
+/** How many lines an attribution such as "On …, Jane <jane@acme.com> wrote:" can wrap over. */
+const ATTRIBUTION_LINES = 3;
+/** How an attribution starts in common languages, so a wrapped one isn't searched above its first line. */
+const ATTRIBUTION_START = /^\s*(On|Le|El|Am|Il|Op|Em)\s/;
+/** A forwarded or replied-to message in Outlook's style. */
+const ORIGINAL_MESSAGE = /^(-{2,}\s*original message\s*-{2,}|_{10,})\s*$/i;
+
+/**
+ * The reply's own text, without the earlier messages it quotes: the first block of "> " lines and the attribution line(s)
+ * just above it, or an Outlook "Original Message", and everything after. The whole text when nothing would be left.
+ */
+export function withoutQuotedReply(text: string) {
+  const lines = text.split(/\r?\n/);
+  let end = lines.findIndex((line) => line.startsWith(">") || ORIGINAL_MESSAGE.test(line.trim()));
+  if (end === -1) return text.trim();
+  if (lines[end].startsWith(">")) {
+    let above = end;
+    while (above > 0 && lines[above - 1].trim() === "") above--;
+    // The attribution ends with a colon, such as "wrote:", "a écrit :" or "schrieb:".
+    if (above > 0 && lines[above - 1].trim().endsWith(":")) {
+      let start = above - 1;
+      while (
+        start > 0 &&
+        above - start < ATTRIBUTION_LINES &&
+        !ATTRIBUTION_START.test(lines[start]) &&
+        lines[start - 1].trim() !== ""
+      ) {
+        start--;
+      }
+      end = start;
+    }
+  }
+  const own = lines.slice(0, end).join("\n").trim();
+  return own === "" ? text.trim() : own;
+}
+
+/**
+ * A Gmail API message, in the full format, as a thread message. Its plain text body is preferred over its HTML, and the
+ * earlier messages it quotes are left out.
+ */
 export function threadMessage({ id, labelIds = [], internalDate, snippet, payload }: GmailMessage): ThreadMessage {
   const from = payload.headers?.find(({ name }) => name.toLowerCase() === "from")?.value ?? "";
   const html = partText(payload, "text/html");
-  const text = partText(payload, "text/plain") ?? (html !== undefined ? htmlText(html) : (snippet ?? ""));
+  const text = partText(payload, "text/plain") ?? (html !== undefined ? htmlText(htmlWithoutQuote(html)) : (snippet ?? ""));
   return {
     gmailMessageId: id,
     ...sender(from),
     receivedAt: new Date(Number(internalDate)),
-    text: text.trim(),
+    text: withoutQuotedReply(text),
     fromAdmin: labelIds.includes("SENT") || labelIds.includes("DRAFT"),
   };
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { CollapsibleText } from "@/components/collapsible-text";
 import { Card, dateTime, EmptyState } from "@/components/ui";
 import type { RecipientKey, Reply } from "@/lib/gateways";
 
@@ -46,8 +47,7 @@ export function ReplyList({ replies, timeZone }: { replies: Reply[]; timeZone: s
               >
                 {reply.jobTitle} at {reply.companyName}
               </Link>
-              {/* Plain text: React escapes it, so HTML in an email never renders. */}
-              <p className="mt-2 text-sm break-words whitespace-pre-wrap text-fg-2">{reply.text}</p>
+              <CollapsibleText text={reply.text} className="mt-2" />
             </div>
           </li>
         ))}

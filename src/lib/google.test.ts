@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { threadMessage } from "./google";
+import { threadMessage, withoutQuotedReply } from "./google";
 
 const data = (text: string) => Buffer.from(text, "utf8").toString("base64url");
 
@@ -47,4 +47,52 @@ test("the Admin's sent messages and drafts are marked as theirs", () => {
 
   expect(threadMessage({ id: "1", labelIds: ["SENT"], internalDate: "0", payload }).fromAdmin).toBe(true);
   expect(threadMessage({ id: "2", labelIds: ["DRAFT"], internalDate: "0", payload }).fromAdmin).toBe(true);
+});
+
+test("a Gmail reply leaves out the quoted email and its wrapped attribution", () => {
+  const text = [
+    "Yes, received.",
+    "",
+    "On Thu, 26 Nov 2026 at 11:18, Malki Abderrahmane <admin@example.com>",
+    "wrote:",
+    "",
+    "> Hi,",
+    ">",
+    "> This is a test email.",
+    ">",
+  ].join("\r\n");
+
+  expect(withoutQuotedReply(text)).toBe("Yes, received.");
+});
+
+test("a reply's own lines just above an attribution are kept", () => {
+  expect(withoutQuotedReply("Thanks!\nSee you Monday.\nLe jeu. 26 nov. 2026, Admin a écrit :\n> Hi")).toBe(
+    "Thanks!\nSee you Monday.",
+  );
+});
+
+test("an Outlook reply leaves out the original message", () => {
+  expect(withoutQuotedReply("Sounds good.\n\n-----Original Message-----\nFrom: Admin\nSent: Thursday")).toBe("Sounds good.");
+  expect(withoutQuotedReply("Sounds good.\n\n________________________________\nFrom: Admin")).toBe("Sounds good.");
+});
+
+test("a reply that is only a quote, or has none, is kept whole", () => {
+  expect(withoutQuotedReply("> Hi")).toBe("> Hi");
+  expect(withoutQuotedReply("  Thanks, let's talk.\n")).toBe("Thanks, let's talk.");
+});
+
+test("an HTML-only reply leaves out its Gmail quote", () => {
+  const message = threadMessage({
+    id: "reply-1",
+    internalDate: "0",
+    payload: {
+      mimeType: "text/html",
+      headers: [{ name: "From", value: "jane@acme.com" }],
+      body: {
+        data: data('<div>Yes, received.</div><br><div class="gmail_quote"><div class="gmail_attr">On Thu wrote:</div><blockquote>Hi</blockquote></div>'),
+      },
+    },
+  });
+
+  expect(message.text).toBe("Yes, received.");
 });
