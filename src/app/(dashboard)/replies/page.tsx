@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { buttonClass } from "@/components/button";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, PageHeader } from "@/components/ui";
 import { startFunction } from "@/lib/dashboard-functions";
@@ -35,11 +37,16 @@ export default async function RepliesPage() {
         title="Replies"
         subtitle="Who replied to your emails, with their latest message, the most recent first"
         action={
-          <form action={startReplyCheck}>
-            <SubmitButton pendingText="Starting…" disabled={running}>
-              {running ? "Checking…" : "Check Replies"}
-            </SubmitButton>
-          </form>
+          <div className="flex gap-2">
+            <Link href="/test-email" className={buttonClass("secondary")}>
+              Test Email
+            </Link>
+            <form action={startReplyCheck}>
+              <SubmitButton pendingText="Starting…" disabled={running}>
+                {running ? "Checking…" : "Check Replies"}
+              </SubmitButton>
+            </form>
+          </div>
         }
       />
       {running && (

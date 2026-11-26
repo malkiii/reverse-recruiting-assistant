@@ -1,4 +1,4 @@
-// TEMPORARY: backs the Test Email page, which checks email tracking end to end. Remove with the page.
+// Backs the Test Email page, which checks email tracking end to end.
 import { and, eq, inArray } from "drizzle-orm";
 import { client } from "./drizzle";
 import type { GmailGateway } from "./gateways";

@@ -1,4 +1,4 @@
-// TEMPORARY: a page to send a test email and check that its reply is tracked. Remove with src/lib/test-email.ts.
+// Sends a test email and shows whether its reply is tracked. Reached from the Replies page.
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -50,7 +50,7 @@ export default async function TestEmailPage({
     <div className="space-y-4">
       <PageHeader
         title="Test Email"
-        subtitle="Temporary: sends a test email you can reply to, to check that Check Replies finds the reply"
+        subtitle="Sends a test email you can reply to, to check that Check Replies finds the reply"
       />
       {error && <Alert>{error}</Alert>}
       {sent && <Alert tone="info">Sent. Reply to it from that inbox, then click Check Replies on the Replies page.</Alert>}
