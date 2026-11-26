@@ -92,7 +92,8 @@ const OLD_DATA_MONTHS = 6;
 
 let db: PostgresJsDatabase | undefined;
 
-function client(databaseUrl: string) {
+/** Exported for the temporary Test Email page. */
+export function client(databaseUrl: string) {
   // Pipelined queries hang forever through the Supabase transaction pooler.
   db ??= drizzle(postgres(databaseUrl, { prepare: false, max: 1, max_pipeline: 1 }));
   return db;
