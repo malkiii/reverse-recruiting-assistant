@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { JobPageReader, JobStore, LlmGateway } from "./gateways";
 
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 const INSTRUCTIONS =
   "You read one job posting page, given as markdown, and give the job's details. " +
   "Give postDay as YYYY-MM-DD only when the page shows the date the job was posted, working out a relative age " +
@@ -35,23 +33,13 @@ export async function readJobPage({ jobPages, llm, jobs }: ReadJobPageDeps, url:
     prompt: `Today is ${today}.\n\n<job-page url="${url}">\n${description}\n</job-page>`,
     schema: answerSchema,
   });
-  const draft: JobDraft = { ...answer, postDay: ISO_DAY.test(answer.postDay) ? answer.postDay : today, url, description };
+  const draft: JobDraft = { ...answer, postDay: z.iso.date().safeParse(answer.postDay).success ? answer.postDay : today, url, description };
   return { kind: "draft" as const, draft };
 }
 
-export const MANUAL_SOURCE = "manual";
+const MANUAL_SOURCE = "manual";
 
 /** Saves the draft the Admin checked as a manual Job, and returns its ID: a Duplicate Job's when it is one. */
-export function addManualJob({ jobs }: { jobs: JobStore }, { title, companyName, location, url, postDay, description, companyLinkedinUrl }: JobDraft) {
-  return jobs.add({
-    source: MANUAL_SOURCE,
-    title,
-    companyName,
-    location,
-    url,
-    postDay,
-    description,
-    companyLinkedinUrl: companyLinkedinUrl || null,
-    companyLogoUrl: null,
-  });
+export function addManualJob({ jobs }: { jobs: JobStore }, draft: JobDraft) {
+  return jobs.add({ ...draft, source: MANUAL_SOURCE, companyLinkedinUrl: draft.companyLinkedinUrl || null, companyLogoUrl: null });
 }

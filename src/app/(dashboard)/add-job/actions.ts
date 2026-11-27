@@ -12,9 +12,12 @@ import { addManualJob, type JobDraft, readJobPage } from "@/lib/manual-job";
 export type ReadState = { url: string; draft?: JobDraft; error?: string };
 export type SaveState = { error?: string };
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** What went wrong, as the Admin should read it: a form check's first message, or the error's. */
+const errorMessage = (error: unknown) =>
+  error instanceof z.ZodError ? error.issues[0].message : error instanceof Error ? error.message : String(error);
 
-const urlSchema = z.url({ protocol: /^https?$/, error: "Enter the Job page's full URL, starting with https://" });
+const webUrl = (error: string) => z.url({ protocol: /^https?$/, error });
+const urlSchema = webUrl("Enter the Job page's full URL, starting with https://");
 
 /** Reads the Job page into a draft for the Admin to check. A URL that's already a saved Job Prepares that one. */
 export async function readJobPageAction(_state: ReadState, formData: FormData): Promise<ReadState> {
@@ -35,7 +38,7 @@ export async function readJobPageAction(_state: ReadState, formData: FormData): 
     if (result.kind === "saved") applicationId = await prepareJob(result.jobId);
     else draft = result.draft;
   } catch (error) {
-    return { url, error: error instanceof z.ZodError ? error.issues[0].message : message(error) };
+    return { url, error: errorMessage(error) };
   }
   if (applicationId !== undefined) redirect(`/applications/${applicationId}`);
   return { url, draft: draft! };
@@ -46,7 +49,7 @@ const draftSchema = z.object({
   companyName: z.string().trim().min(1, "Enter the Company name"),
   location: z.string().trim(),
   postDay: z.iso.date("Enter the post day as a date"),
-  companyLinkedinUrl: z.union([z.literal(""), z.url({ error: "Enter the Company's LinkedIn URL in full, or leave it empty" })]),
+  companyLinkedinUrl: z.union([z.literal(""), webUrl("Enter the Company's LinkedIn URL in full, or leave it empty")]),
   url: urlSchema,
   description: z.string().trim().min(1, "The description is empty"),
 });
@@ -59,7 +62,7 @@ export async function saveJobAction(_state: SaveState, formData: FormData): Prom
     const { DATABASE_URL } = parseDashboardEnv(process.env);
     applicationId = await prepareJob(await addManualJob({ jobs: drizzleJobStore(DATABASE_URL) }, draft));
   } catch (error) {
-    return { error: error instanceof z.ZodError ? error.issues[0].message : message(error) };
+    return { error: errorMessage(error) };
   }
   redirect(`/applications/${applicationId}`);
 }
