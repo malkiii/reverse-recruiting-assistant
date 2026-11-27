@@ -25,10 +25,10 @@ import {
 } from "@/components/ui";
 import { startFunction } from "@/lib/dashboard-functions";
 import { loadStatsRows } from "@/lib/dashboard-data";
+import { prepareJob } from "@/lib/dashboard-prepare";
 import { jobsStrip } from "@/lib/dashboard-stats";
 import {
   drizzleFunctionRunStore,
-  findApplicationIdForJob,
   listJobFilterOptions,
   listJobsWithApplications,
 } from "@/lib/drizzle";
@@ -44,7 +44,7 @@ import {
   type SearchParams,
   withParams,
 } from "@/lib/table-filters";
-import { COLLECT_JOBS, PREPARE_APPLICATION } from "@/lib/schema";
+import { COLLECT_JOBS } from "@/lib/schema";
 import { CollectionSettings } from "./collection-settings";
 
 async function startCollection() {
@@ -55,18 +55,10 @@ async function startCollection() {
   revalidatePath("/jobs");
 }
 
-async function prepareJob(formData: FormData) {
+async function prepareJobAction(formData: FormData) {
   "use server";
 
-  const jobId = Number(formData.get("jobId"));
-  const response = await startFunction(PREPARE_APPLICATION, { jobId });
-  // A 409 means the Job already has its one Application, so the Admin is shown that one.
-  const applicationId =
-    response.status === 202
-      ? response.applicationId
-      : await findApplicationIdForJob(parseDashboardEnv(process.env).DATABASE_URL, jobId);
-  if (applicationId === undefined) throw new Error(`Job ${jobId} couldn't be Prepared`);
-  redirect(`/applications/${applicationId}`);
+  redirect(`/applications/${await prepareJob(Number(formData.get("jobId")))}`);
 }
 
 type JobRow = Awaited<ReturnType<typeof listJobsWithApplications>>["rows"][number];
@@ -86,7 +78,7 @@ function ApplicationCell({ job, block }: { job: JobRow; block?: boolean }) {
     );
   }
   return (
-    <form action={prepareJob}>
+    <form action={prepareJobAction}>
       <input type="hidden" name="jobId" value={job.id} />
       <SubmitButton variant="secondary" pendingText="Preparing…" block={block}>
         Prepare

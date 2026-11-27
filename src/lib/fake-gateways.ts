@@ -162,16 +162,28 @@ export class FakeJobStore implements JobStore {
   async save(jobs: Job[]) {
     const before = this.jobs.length;
     for (const job of jobs) {
-      const duplicate = this.jobs.some(
-        (saved) =>
-          saved.url === job.url ||
-          (saved.title.toLowerCase() === job.title.toLowerCase() &&
-            saved.companyName.toLowerCase() === job.companyName.toLowerCase() &&
-            saved.postDay === job.postDay),
-      );
-      if (!duplicate) this.jobs.push({ ...job, id: this.jobs.length + 1, alertState: "pending" });
+      if (!this.duplicateOf(job)) this.jobs.push({ ...job, id: this.jobs.length + 1, alertState: "pending" });
     }
     return this.jobs.length - before;
+  }
+
+  /** The saved Job that the Job is a Duplicate Job of. */
+  private duplicateOf(job: Job) {
+    return this.jobs.find(
+      (saved) =>
+        saved.url === job.url ||
+        (saved.title.toLowerCase() === job.title.toLowerCase() &&
+          saved.companyName.toLowerCase() === job.companyName.toLowerCase() &&
+          saved.postDay === job.postDay),
+    );
+  }
+
+  async add(job: Job) {
+    const duplicate = this.duplicateOf(job);
+    if (duplicate) return duplicate.id;
+    const id = this.jobs.length + 1;
+    this.jobs.push({ ...job, id, alertState: "dashboard-only" });
+    return id;
   }
 
   async list(): Promise<Job[]> {
@@ -183,6 +195,11 @@ export class FakeJobStore implements JobStore {
     if (!saved) return undefined;
     const { alertState: _, ...job } = saved;
     return job;
+  }
+
+  async findByUrl(url: string) {
+    const saved = this.jobs.find((job) => job.url === url);
+    return saved && this.get(saved.id);
   }
 
   async listPendingAlerts() {

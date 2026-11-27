@@ -173,6 +173,31 @@ export function drizzleJobStore(databaseUrl: string): JobStore {
       return inserted.length;
     },
 
+    async add(job: Job) {
+      const db = client(databaseUrl);
+      const [inserted] = await db
+        .insert(jobs)
+        .values({ ...job, alertState: "dashboard-only" })
+        .onConflictDoNothing()
+        .returning({ id: jobs.id });
+      if (inserted) return inserted.id;
+      const [duplicate] = await db
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(
+          or(
+            eq(jobs.url, job.url),
+            and(
+              eq(sql`lower(${jobs.title})`, job.title.toLowerCase()),
+              eq(sql`lower(${jobs.companyName})`, job.companyName.toLowerCase()),
+              eq(jobs.postDay, job.postDay),
+            ),
+          ),
+        );
+      if (!duplicate) throw new Error(`Job ${job.url} was neither saved nor a Duplicate Job`);
+      return duplicate.id;
+    },
+
     list() {
       const { id: _id, alertState: _alertState, ...columns } = getTableColumns(jobs);
       return client(databaseUrl)
@@ -185,6 +210,11 @@ export function drizzleJobStore(databaseUrl: string): JobStore {
     async get(id: number) {
       const columns = savedJobColumns();
       const [job] = await client(databaseUrl).select(columns).from(jobs).where(eq(jobs.id, id));
+      return job;
+    },
+
+    async findByUrl(url: string) {
+      const [job] = await client(databaseUrl).select(savedJobColumns()).from(jobs).where(eq(jobs.url, url));
       return job;
     },
 

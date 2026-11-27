@@ -146,8 +146,12 @@ export type ActorRunStatus = "running" | "succeeded" | "failed";
 export interface JobStore {
   /** Ignores any Job whose URL is already saved, and returns how many were new. */
   save(jobs: Job[]): Promise<number>;
+  /** Saves a Job the Admin added, with no Job Alert, and returns its ID: a Duplicate Job's ID when it is one. */
+  add(job: Job): Promise<number>;
   list(): Promise<Job[]>;
   get(id: number): Promise<SavedJob | undefined>;
+  /** The saved Job with this URL. */
+  findByUrl(url: string): Promise<SavedJob | undefined>;
   /** Jobs whose Job Alert hasn't gone out yet, oldest first. */
   listPendingAlerts(): Promise<PendingAlertJob[]>;
   markAlertSent(id: number): Promise<void>;

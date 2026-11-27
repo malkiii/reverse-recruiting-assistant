@@ -34,6 +34,11 @@ const TABS = [
     ),
   },
   {
+    href: "/add-job",
+    label: "Add Job",
+    icon: icon(<path d="M12 5v14M5 12h14" />),
+  },
+  {
     href: "/applications",
     label: "Applications",
     icon: icon(

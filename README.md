@@ -15,7 +15,7 @@ Copy `.env.example` to `.env.local`. The dashboard and Functions each validate o
 | `GOOGLE_CLIENT_ID`   | Dashboard, Functions | Google OAuth client, for Gmail and Drive          |
 | `GOOGLE_CLIENT_SECRET` | Dashboard, Functions | Google OAuth client secret                      |
 | `APIFY_TOKENS`       | Functions            | Comma-separated Apify tokens: Job Boards, Decision Makers |
-| `FIRECRAWL_API_KEY`  | Functions            | Firecrawl key: Job Feeds, Job pages, Company pages |
+| `FIRECRAWL_API_KEY`  | Functions, Dashboard | Firecrawl key: Job Feeds, Job pages, Company pages; optional on the dashboard, for Add Job |
 | `TELEGRAM_BOT_TOKEN` | Functions            | Telegram bot that sends Failure Alerts            |
 | `TELEGRAM_CHAT_ID`   | Functions            | The Admin's Telegram chat                         |
 | `DASHBOARD_URL`      | Functions            | Public dashboard URL, linked from Failure Alerts  |
@@ -64,7 +64,7 @@ A push to `master` runs `.github/workflows/deploy.yml`, which applies migrations
 | Where          | Secret                                                                                                        | Purpose                                   |
 | -------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Modal          | `DATABASE_URL`, `FUNCTIONS_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APIFY_TOKENS`, `FIRECRAWL_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_URL` | Runtime variables for Functions           |
-| Vercel         | `DATABASE_URL`, `FUNCTIONS_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DASHBOARD_PASSWORD`, `FUNCTIONS_BASE_URL` | Runtime variables for the dashboard       |
+| Vercel         | `DATABASE_URL`, `FUNCTIONS_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DASHBOARD_PASSWORD`, `FUNCTIONS_BASE_URL`, `FIRECRAWL_API_KEY` | Runtime variables for the dashboard       |
 | GitHub Actions | `DIRECT_DATABASE_URL`                                                                                         | Direct database connection for migrations |
 | GitHub Actions | `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`                                                                        | Modal token for `modal deploy`            |
 | GitHub Actions | `TIMEZONE` (variable, not secret), e.g. `Africa/Algiers`; defaults to `UTC`                                   | Timezone of the scheduled Job Collection  |

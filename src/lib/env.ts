@@ -25,6 +25,8 @@ const functionsSchema = sharedSchema.extend({
 const dashboardSchema = sharedSchema.extend({
   DASHBOARD_PASSWORD: z.string().min(1),
   FUNCTIONS_BASE_URL: z.url(),
+  // Reads the Job pages the Admin adds. Optional: without it, Add Job says to add it.
+  FIRECRAWL_API_KEY: z.string().optional(),
   // Where "today" starts on the dashboard, as for the scheduled Job Collection.
   TIMEZONE: z
     .string()

@@ -19,8 +19,12 @@ A filtered job listing URL that the Admin copies from any website and gives to t
 _Avoid_: Search, Job Board, saved search
 
 **Job**:
-A unique open position found on a Job Board or Job Feed, displayed to the Admin once.
+A unique open position found on a Job Board or Job Feed, or added by the Admin, displayed to the Admin once.
 _Avoid_: Listing, posting, vacancy
+
+**Manual Job**:
+A Job the Admin added from its public URL on the Add Job page. It gets no Job Alert and is Prepared once saved.
+_Avoid_: Custom Job, imported Job
 
 **Duplicate Job**:
 A Job with the same URL as another, or the same title, Company and post day.
